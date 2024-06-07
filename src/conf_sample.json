@@ -1,0 +1,391 @@
+{
+    "port_range": [
+        3000,
+        3040
+    ],
+    "proxy_host": null,
+    "proxy_port": 9234,
+    "proxy_socks_port": 12345,
+    "proxy_user": "user_name",
+    "proxy_pass": "user_password",
+    "proxies": {
+        "http://": "http://{proxy_host}:{proxy_port}/"
+    },
+    "conf_basepath_win": "d:/",
+    "conf_basepath_linux": "/dev/shm/",
+    "pac_server_port": 3344,
+    "pac_server_file_win": "d:/vsprj/test_rust/get_proxy/src/pac_file.js",
+    "pac_server_file_linux": "/home/pi/get_proxy/pac_file.js",
+    "qqwry_path_win": "d:/vsprj/test_rust/get_proxy/qqwry.dat",
+    "qqwry_path_linux": "/home/pi/get_proxy/qqwry.dat",
+    "v2ray_path_win": "D:/app/v2rayN-With-Core/bin/v2fly_v5/v2ray.exe",
+    "v2ray_path_linux": "/usr/local/bin/v2ray",
+    "test_wait_milliseconds": 5000,
+    "proxy_output_file_win": null,
+    "proxy_output_file_linux": "/dev/shm/proxy_r.log",
+    "proxy_output_file_loglevel": "warning",
+    "candidate_max": 8,
+    "candidate_min": 3,
+    "headers": {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36 Edg/109.0.1518.78"
+    },
+    "conf_tpl": {
+        "log": {
+            "access": "",
+            "error": "",
+            "loglevel": "warning"
+        },
+        "api": {
+            "tag": "api",
+            "services": [
+                "StatsService"
+            ]
+        },
+        "dns": {},
+        "routing": {
+            "domainStrategy": "IPIfNonMatch",
+            "domainMatcher": "linear",
+            "rules": [
+                {
+                    "type": "field",
+                    "inboundTag": [
+                        "api"
+                    ],
+                    "outboundTag": "api",
+                    "enabled": true
+                },
+                {
+                    "id": "4840270311056198635",
+                    "type": "field",
+                    "outboundTag": "direct",
+                    "domain": [
+                        "domain:bing.com",
+                        "domain:baidu.com"
+                    ],
+                    "enabled": true
+                },
+                {
+                    "id": "5572774766501182519",
+                    "type": "field",
+                    "outboundTag": "block",
+                    "domain": [
+                        "geosite:category-ads-all"
+                    ],
+                    "enabled": true
+                },
+                {
+                    "id": "5197249276552284053",
+                    "type": "field",
+                    "outboundTag": "direct",
+                    "domain": [
+                        "geosite:cn"
+                    ],
+                    "enabled": true
+                },
+                {
+                    "id": "5037349541415266138",
+                    "type": "field",
+                    "outboundTag": "direct",
+                    "ip": [
+                        "geoip:private",
+                        "geoip:cn"
+                    ],
+                    "enabled": true
+                },
+                {
+                    "id": "5125704558895554114",
+                    "type": "field",
+                    "port": "0-65535",
+                    "outboundTag": "proxy",
+                    "enabled": true
+                }
+            ]
+        },
+        "policy": {
+            "system": {
+                "statsOutboundUplink": false,
+                "statsOutboundDownlink": false
+            }
+        },
+        "inbounds": null,
+        "outbounds": null,
+        "transport": {},
+        "stats": {}
+    },
+    "inboundsSetting": [
+        {
+            "tag": "http",
+            "listen": null,
+            "port": null,
+            "protocol": "http",
+            "settings": {
+                "auth": "password",
+                "accounts": [
+                    {
+                        "user": null,
+                        "pass": null
+                    }
+                ],
+                "udp": true,
+                "allowTransparent": false
+            },
+            "streamSettings": {},
+            "sniffing": {
+                "enabled": false,
+                "destOverride": [
+                    "http",
+                    "tls"
+                ],
+                "routeOnly": false
+            }
+        },
+        {
+            "tag": "socks",
+            "listen": null,
+            "port": null,
+            "protocol": "socks",
+            "sniffing": {
+                "enabled": false,
+                "destOverride": [
+                    "http",
+                    "tls"
+                ],
+                "routeOnly": false
+            },
+            "settings": {
+                "auth": "password",
+                "accounts": [
+                    {
+                        "user": null,
+                        "pass": null
+                    }
+                ],
+                "udp": false,
+                "allowTransparent": false
+            }
+        },
+        {
+            "tag": "http_noauth",
+            "port": null,
+            "listen": null,
+            "protocol": "http",
+            "sniffing": {
+                "enabled": false,
+                "destOverride": [
+                    "http",
+                    "tls"
+                ],
+                "routeOnly": false
+            },
+            "settings": {
+                "auth": "noauth",
+                "udp": true,
+                "allowTransparent": false
+            }
+        },
+        {
+            "tag": "socks_noauth",
+            "port": null,
+            "listen": null,
+            "protocol": "socks",
+            "sniffing": {
+                "enabled": false,
+                "destOverride": [
+                    "http",
+                    "tls"
+                ],
+                "routeOnly": false
+            },
+            "settings": {
+                "auth": "noauth",
+                "udp": true,
+                "allowTransparent": false
+            }
+        }
+    ],
+    "outboundsSetting_vmess": [
+        {
+            "tag": "proxy",
+            "protocol": "vmess",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": null,
+                        "port": 0,
+                        "users": [
+                            {
+                                "id": null,
+                                "alterId": 0,
+                                "email": "t@t.tt",
+                                "security": "auto"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": null,
+                "tlsSettings": {
+                    "allowInsecure": false,
+                    "show": false
+                },
+                "wsSettings": {
+                    "path": null,
+                    "headers": {}
+                }
+            },
+            "mux": {
+                "enabled": false,
+                "concurrency": -1
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ],
+    "outboundsSetting_ss": [
+        {
+            "tag": "proxy",
+            "protocol": "shadowsocks",
+            "settings": {
+                "servers": [
+                    {
+                        "address": null,
+                        "method": null,
+                        "ota": false,
+                        "password": null,
+                        "port": null,
+                        "level": 1
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp"
+            },
+            "mux": {
+                "enabled": false,
+                "concurrency": -1
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ],
+    "outboundsSetting_trojan": [
+        {
+            "tag": "proxy",
+            "protocol": "trojan",
+            "settings": {
+                "servers": [
+                    {
+                        "method": "chacha20",
+                        "address": null,
+                        "port": null,
+                        "password": null,
+                        "ota": false,
+                        "level": 1
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "tls",
+                "tlsSettings": {
+                    "allowInsecure": false,
+                    "show": false
+                }
+            },
+            "mux": {
+                "enabled": false,
+                "concurrency": -1
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ],
+    "outboundsSetting_vless": [
+        {
+            "tag": "proxy",
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": null,
+                        "port": null,
+                        "users": [
+                            {
+                                "id": null,
+                                "alterId": null,
+                                "email": null,
+                                "security": "auto",
+                                "encryption": "",
+                                "flow": ""
+                            }
+                        ]
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": null,
+                "security": null
+            },
+            "mux": {
+                "enabled": false,
+                "concurrency": -1
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.inlayHints.chainingHints.enable": false,
+    "rust-analyzer.inlayHints.typeHints.enable": false,
+    "rust-analyzer.inlayHints.closureCaptureHints.enable": true,
+    "rust-analyzer.linkedProjects": [
+        ".\\Cargo.toml"
+    ]
+}

@@ -1,0 +1,40 @@
+[package]
+name = "get_proxy"
+version = "0.1.1"
+edition = "2021"
+
+[profile.release]
+codegen-units = 1  # 减少并行代码生成单元以提高优化
+lto = true  # 启用链接时优化
+opt-level = "z"  #  二进制文件大小优化
+strip = true  # 自动从二进制文件去除符号信息.
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-channel = "2.2.0"
+async-priority-channel = "0.2.0"
+base64 = "0.21.7"
+bytes = "1.6.0"
+chrono = "0.4.37"
+clap = "4.5.4"
+dnsclientx = {version="0.4.1", features=["tokio-async"]}
+env_logger = "0.11.3"
+futures = "0.3.30"
+libc = "0.2.153"
+log = "0.4.21"
+memmap = "0.7.0"
+notify = { version = "6.1.1", default-features = false, features = ["serde", "macos_kqueue"]}
+rand = "0.8.5"
+regex = "1.10.3"
+reqwest = { version = "0.11.24", features = ["json",  "rustls-tls"], default-features = false }
+scraper = "0.19.0"
+# reqwest = "0.11.24"
+serde = { version = "1.0.196", features = ["derive"] }
+serde_derive = "1.0.196"
+serde_json = "1.0.113"
+serde_yaml = "0.9.33"
+textcode = "0.2.2"
+tokio = {version="1.36.0", features=["full"]}
+url = "2.5.0"
+urlparse = "0.7.3"
