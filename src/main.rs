@@ -1057,6 +1057,10 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/trojan"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/hkpc/V2ray-Configs/main/All_Configs_base64_Sub.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/m3hdio1/v2ray_sub/main/v2ray_sub.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/clash-meta/all.yaml"), 
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
+                    String::from("https://uploadserver.sialkcable.ir/v2ray/config.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                 ];
 
                 // mibei url

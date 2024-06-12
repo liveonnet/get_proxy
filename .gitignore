@@ -1,3 +1,5 @@
 /target
 src/conf.json
 conf.json
+src/*.swp
+*.swp
