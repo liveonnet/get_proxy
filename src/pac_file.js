@@ -1,5 +1,7 @@
 var domains = {
     "google.com": 1,
+    "telegram.org": 1,
+    "cdn-telegram.org": 1,
     "youtube.com": 1,
     "github.com": 1,
     "gstatic.com": 1,
