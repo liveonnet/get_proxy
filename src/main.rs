@@ -1065,6 +1065,7 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://uploadserver.sialkcable.ir/v2ray/config.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Memory2314/VMesslinks/main/links/vmess"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/lagzian/SS-Collector/main/mix.txt"),
                 ];
 
                 // mibei url
