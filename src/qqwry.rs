@@ -2,6 +2,7 @@ use std::fs::File;
 use memmap::Mmap;
 use log::trace;
 
+#[allow(dead_code)]
 pub struct QQWry {
     pub file: String,
     m: Mmap,

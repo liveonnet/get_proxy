@@ -1047,6 +1047,7 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/splitted/mixed"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Surfboardv2ray/Proxy-sorter/main/submerge/converted.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Surfboardv2ray/v2ray-worker-sub/master/sub"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Surfboardv2ray/Subs/main/Raw"),
                     String::from("https://tgscan.onrender.com/sub3"),
                     String::from("https://tgscan.onrender.com/sub5"),
                     String::from("https://tgscan.onrender.com/sub9/base64"),
@@ -1066,6 +1067,7 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Memory2314/VMesslinks/main/links/vmess"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/lagzian/SS-Collector/main/mix.txt"),
+                    String::from("https://mirror.ghproxy.com/https://github.com/v2clash/V2ray-Configs/raw/main/All_Configs_Sub.txt"),
                 ];
 
                 // mibei url

@@ -54,6 +54,7 @@ impl Default for Node {
     }
 }
 
+#[allow(dead_code)]
 trait Descriptive {
     fn describe(&self) -> String;
 }
