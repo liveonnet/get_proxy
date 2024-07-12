@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use url::Url;
 use urlparse::unquote_plus;
 #[allow(unused_imports)]
-use log::{debug, trace, warn, error};
+use log::{info, debug, trace, warn, error};
 use serde_json::Value;
 use serde_json::json;
 use serde_yaml::Value as Yamlv;  
@@ -559,6 +559,36 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)>{
             ret.1 = String::from(&m[1]);
             trace!("{worker_name} got {} byte(s) content from {url}", ret.1.len());
         }
+    }
+
+    Some(ret)
+}
+
+pub async fn get_shareclash_url(worker_name: &str) -> Option<Vec<String>>{
+    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md";
+    let mut ret = vec![];
+    let mut content = String::new();
+    match reqwest::get(url).await {
+        Ok(o) => {
+            if let Ok(s) = o.text().await {
+                trace!("{worker_name} got {} byte(s) from {url}", s.len());
+                content = String::from(s);
+            } else {
+                warn!("{worker_name} can't get content from {url} !!!");
+            }
+        },
+        Err(e) => {
+            trace!("{worker_name} fetching {url} got err {e}");
+        }
+    }
+
+    if let Some(idx) = content.find("V2ray订阅链接") {
+        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
+        for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
+            trace!("{worker_name} got url {}", _url);
+            ret.push(String::from(_url));
+        } 
+        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
     }
 
     Some(ret)

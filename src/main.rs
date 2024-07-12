@@ -1068,15 +1068,41 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Memory2314/VMesslinks/main/links/vmess"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/lagzian/SS-Collector/main/mix.txt"),
                     String::from("https://mirror.ghproxy.com/https://github.com/v2clash/V2ray-Configs/raw/main/All_Configs_Sub.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Ptechgithub/configs/main/clash12.yaml"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/cf.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/80.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/443.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/grpc.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/vmess.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/ws.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/vless.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/trojan.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/tls.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/tcp.txt"),
                 ];
 
                 // mibei url
+                if true {  // debug only
                 let url_out_c = url_out.clone();
                 tokio::spawn(async move{
                     let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
                     if mibei_url.len() > 0 {
                         if let Err(e) = url_out_c.send(mibei_url).await{
                             error!("{worker_name} put url failed!!! {e}");
+                        }
+                    }
+                });
+                }
+
+                // shareclash urls
+                let url_out_c = url_out.clone();
+                tokio::spawn(async move{
+                    let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
+                    if shareclash_urls.len() > 0 {
+                        for url in shareclash_urls {
+                            if let Err(e) = url_out_c.send(String::from(url)).await{
+                                error!("{worker_name} put url failed!!! {e}");
+                            }
                         }
                     }
                 });
@@ -1090,6 +1116,7 @@ async fn dispatch(conf: Arc<Value>,
                 });
 
                 // tolinkshare and vpnnet data
+                if true {  // debug only
                 let data_out_c = data_out.clone();
                 tokio::spawn(async move {
                     let _d1 = proto::get_tolinkshare_data("test").await;
@@ -1102,6 +1129,9 @@ async fn dispatch(conf: Arc<Value>,
                         }
                     }
                 });
+                }
+
+                // let urls: Vec<String> = vec![];  // debug only
 
                 // let urls = [
                 //     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Surfboardv2ray/Subs/main/Raw"),
