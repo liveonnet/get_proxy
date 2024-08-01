@@ -29,6 +29,7 @@ use std::env;
 // use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io;
+use std::io::{stdin,stdout};
 // use std::io::Read;
 use std::io::Write as io_write;
 use std::net::ToSocketAddrs;
@@ -138,6 +139,14 @@ async fn main() {
             .value_parser(value_parser!(bool))
             .num_args(0..=1)
             .help("in measure_mode, just picking, not launch"))
+        .arg(Arg::new("pick_one")
+            .short('p')
+            .long("pick_one")
+            .default_value("false")
+            .default_missing_value("true")
+            .value_parser(value_parser!(bool))
+            .num_args(0..=1)
+            .help("pick_one need user select one url to get node at startup"))
         .arg(Arg::new("config_file")
             .short('c')
             .long("conf_file")
@@ -206,6 +215,11 @@ async fn main() {
         info!("in prod mode");
     }
 
+    let pick_one = matches.get_one::<bool>("pick_one").unwrap();
+    if *pick_one{
+        info!("in pick_one mode");
+    }
+
     // test().await;
     // return;
 
@@ -220,7 +234,7 @@ async fn main() {
 
     // 开启 pac 服务
     tokio::spawn(pac_server(conf_c.clone(), e_exit.clone()));
-    let _ = do_all(conf_c.clone(), &e_exit, *measure_mode).await;
+    let _ = do_all(conf_c.clone(), &e_exit, *measure_mode, *pick_one).await;
     info!("exit.");
 }
 
@@ -255,7 +269,7 @@ async fn ctrl_c_handler(e_exit: Arc<Notify>){
 
 // 处理过程：
 // url -从链接取数据-> data -解析数据构造Node节点-> node -对节点中的域名进行解析获取ip地址-> ip -根据节点ip获取地区信息并过滤-> area -对节点进行排重-> uniq -对节点进行tcp链接测试-> good -对节点进行真实连接进行测试-> candidate -做为备用项使用
-async fn do_all(conf: Arc<Value>, e_exit: &Arc<Notify>, measure_mode: bool) -> MyResult<String> {
+async fn do_all(conf: Arc<Value>, e_exit: &Arc<Notify>, measure_mode: bool, pick_one: bool) -> MyResult<String> {
     let b_stop_process = Arc::new(RwLock::new(false));
     let (url_out, url_in) = bounded(5);
     let (data_out, data_in) = bounded(5);
@@ -279,7 +293,8 @@ async fn do_all(conf: Arc<Value>, e_exit: &Arc<Notify>, measure_mode: bool) -> M
                                     e_candidate_change.clone(),
                                     e_clear.clone(), e_exit.clone(),
                                     b_stop_process.clone(),
-                                    measure_mode
+                                    measure_mode,
+                                    pick_one
                                 )
                         );
 
@@ -676,7 +691,7 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
                         }
                     };
 
-                    // check again, debug only
+                    // check again, debug_only
                     if let None = child.id(){
                         warn!("{cur_worker_name} proxy process exited?");
                     }
@@ -914,10 +929,11 @@ async fn dispatch(conf: Arc<Value>,
     e_candidate_change: Arc<Notify>,
     e_clear: Arc<Notify>, e_exit: Arc<Notify>,
     b_stop_process: Arc<RwLock<bool>>,
-    measure_mode: bool) {
+    measure_mode: bool,
+    pick_one: bool) {
     let worker_name = "[dispatch]";
 
-    info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {} ",
+    info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {}\n pick_one: {}",
         worker_name, conf["v2ray_path"],
         conf["conf_basepath"],
         conf["proxy_host"],
@@ -927,15 +943,17 @@ async fn dispatch(conf: Arc<Value>,
         conf["inboundsSetting"][2]["port"],
         conf["inboundsSetting"][3]["port"],
         conf["proxy_output_file"],
-        measure_mode);
+        measure_mode,
+        pick_one);
 
     // let mut recent_put = false;
     let min_candidate: u64 = conf["candidate_min"].as_u64().unwrap();
     let max_candidate: u64 = conf["candidate_max"].as_u64().unwrap();
     let mut time_add = SystemTime::now().checked_sub(Duration::from_secs(3600)).unwrap_or_else(||UNIX_EPOCH);
     let mut exit_flag = false;
+    let mut pick_index: usize = usize::MAX;
     while !exit_flag{
-        let recent_put = if SystemTime::now().duration_since(time_add).unwrap_or_default().as_secs() >= 90{false}else{true};
+        let recent_put = if SystemTime::now().duration_since(time_add).unwrap_or_default().as_secs() >= 90 { false } else { true };
         let remain = candidate_in.len();
         if remain <= min_candidate && !recent_put{
             if url_in.len() == 0 && data_in.len() == 0 && node_in.len() ==0 && uniq_in.len() == 0 && good_in.len() == 0 {
@@ -952,7 +970,7 @@ async fn dispatch(conf: Arc<Value>,
                 let before_yesterday = yesterday.checked_sub_days(chrono::Days::new(1)).unwrap_or_default();
                 let s_before_yesterday = before_yesterday.format("%Y%m%d").to_string();
 
-                let urls = vec![
+                let mut urls = vec![
                     // format!("https://freenode.me/wp-content/uploads/{}/{:02}/{:02}{:02}.txt", today.year(), today.month(), today.month(), today.day()),
                     // format!("https://freenode.me/wp-content/uploads/{}/{:02}/{:02}{:02}.txt", yesterday.year(), yesterday.month(), yesterday.month(), yesterday.day()),
                     // format!("https://freenode.me/wp-content/uploads/{}/{:02}/{:02}{:02}.txt", before_yesterday.year(), before_yesterday.month(), before_yesterday.month(), before_yesterday.day()),
@@ -1079,68 +1097,143 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/trojan.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/tls.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/tcp.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/vless"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/trojan"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/vmess"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/ss"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/abbasdvd3/clash/main/3.yaml"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/V2RAY_SUB.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/linzjian666/chromego_extractor/main/outputs/clash_meta.yaml"),
                 ];
 
                 // mibei url
-                if true {  // debug only
                 let url_out_c = url_out.clone();
+                let pick_one_c = pick_one.clone();
+                let mut urls_c = urls.clone();
                 tokio::spawn(async move{
                     let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
                     if mibei_url.len() > 0 {
-                        if let Err(e) = url_out_c.send(mibei_url).await{
-                            error!("{worker_name} put url failed!!! {e}");
-                        }
-                    }
-                });
-                }
-
-                // shareclash urls
-                let url_out_c = url_out.clone();
-                tokio::spawn(async move{
-                    let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
-                    if shareclash_urls.len() > 0 {
-                        for url in shareclash_urls {
-                            if let Err(e) = url_out_c.send(String::from(url)).await{
+                        if pick_one_c {
+                            urls_c.push(mibei_url);
+                        }else{
+                            if let Err(e) = url_out_c.send(mibei_url).await{
                                 error!("{worker_name} put url failed!!! {e}");
                             }
                         }
                     }
                 });
 
-                // 打乱顺序
-                let urls = tokio::task::block_in_place(||{
-                    let mut url_dup = urls.clone();
-                    let mut rng = rand::thread_rng();
-                    url_dup.shuffle(&mut rng);
-                    url_dup
-                });
-
-                // tolinkshare and vpnnet data
-                if true {  // debug only
-                let data_out_c = data_out.clone();
-                tokio::spawn(async move {
-                    let _d1 = proto::get_tolinkshare_data("test").await;
-                    let _d2 = proto::get_vpnnet_data("test").await;
-                    for _ret in [_d1, _d2] {
-                        if let Some(_x) = _ret {
-                            if let Err(e) = data_out_c.send(_x).await{
-                                error!("{worker_name} put data failed!!! {e}");
+                // shareclash urls
+                let url_out_c = url_out.clone();
+                let pick_one_c = pick_one.clone();
+                let mut urls_c = urls.clone();
+                tokio::spawn(async move{
+                    let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
+                    if shareclash_urls.len() > 0 {
+                        for url in shareclash_urls {
+                            if pick_one_c {
+                                urls_c.push(url);
+                            }else{
+                                if let Err(e) = url_out_c.send(String::from(url)).await{
+                                    error!("{worker_name} put url failed!!! {e}");
+                                }
                             }
                         }
                     }
                 });
+
+                // v2rayclashnode urls
+                let url_out_c = url_out.clone();
+                let pick_one_c = pick_one.clone();
+                let mut urls_c = urls.clone();
+                tokio::spawn(async move{
+                    let l_urls = proto::get_v2rayclashnode_url(worker_name).await.unwrap_or_default();
+                    if l_urls.len() > 0 {
+                        for url in l_urls {
+                            if pick_one_c {
+                                urls_c.push(url);
+                            }else{
+                                if let Err(e) = url_out_c.send(String::from(url)).await{
+                                    error!("{worker_name} put url failed!!! {e}");
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 打乱顺序
+                if !pick_one {
+                    urls = tokio::task::block_in_place(||{
+                        let mut url_dup = urls.clone();
+                        let mut rng = rand::thread_rng();
+                        url_dup.shuffle(&mut rng);
+                        url_dup
+                    });
                 }
 
-                // let urls: Vec<String> = vec![];  // debug only
-
-                // let urls = [
-                //     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Surfboardv2ray/Subs/main/Raw"),
-                // ];
+                // tolinkshare and vpnnet data
+                if !pick_one{
+                    let data_out_c = data_out.clone();
+                    tokio::spawn(async move {
+                        let _d1 = proto::get_tolinkshare_data("test").await;
+                        let _d2 = proto::get_vpnnet_data("test").await;
+                        for _ret in [_d1, _d2] {
+                            if let Some(_x) = _ret {
+                                if let Err(e) = data_out_c.send(_x).await{
+                                    error!("{worker_name} put data failed!!! {e}");
+                                }
+                            }
+                        }
+                    });
+                }else{
+                    warn!("in pick_one mode, tolinkshare and vpnnet skip processing !!!");
+                }
 
                 debug!("{worker_name} regular urls len {}", urls.len());
-                for url in urls {
-                    if let Err(e) = url_out.send(String::from(url)).await{
+                if pick_one && pick_index == usize::MAX {
+                    for (_i, _url) in urls.iter().enumerate() {
+                        println!("{_i}: {_url}");
+                    }
+                    let mut s = String::new();
+                    loop {
+                        s.clear();
+                        print!("select by index:");
+                        let _ = stdout().flush();
+                        match stdin().read_line(&mut s){
+                            Ok(_) => {
+                                s = s.trim().to_string();
+                                // println!("you typed {s}");
+                                if let Ok(n) = s.parse(){
+                                    if n < urls.len() {
+                                        pick_index = n;
+                                        break;
+                                    }else{
+                                        println!("out of index!");
+                                    }
+                                }else{
+                                    println!("bad input!");
+                                }
+                            },
+                            Err(e) => {
+                                error!("got error {e}");
+                            }
+                        }
+                    }
+                }
+
+                if pick_index != usize::MAX {
+                    info!("the index {pick_index} is used: {}", urls[pick_index]);
+                    if let Err(e) = url_out.send(String::from(urls[pick_index].clone())).await{
                         error!("{worker_name} put url failed!!! {e}");
+                    }
+                }else{
+                    for url in urls {
+                        if let Err(e) = url_out.send(String::from(url)).await{
+                            error!("{worker_name} put url failed!!! {e}");
+                        }
                     }
                 }
 
