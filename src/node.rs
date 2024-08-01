@@ -287,7 +287,7 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
                     }
                 },
                 unknown @ _ => {
-                    warn!("{worker_name} unknown network={unknown} in vless, node={node}, node.param={:?}, node.source={}", node.param, node.source);
+                    warn!("{worker_name} unknown network={unknown} in vless, node={node}, node.param={:?}, node.source={}, node.raw={}", node.param, node.source, node.raw);
                 }
             }
             setting = conf["conf_tpl"].clone();

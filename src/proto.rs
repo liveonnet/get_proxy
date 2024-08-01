@@ -17,7 +17,7 @@ use crate::tools::b64d;
 use async_channel::Sender;
 
 pub async fn data2node_one(worker_name: &String, s: &String, url: &String, node_out: &Sender<Node>) -> () {
-    let l_data: Vec<String>;
+    let mut l_data: Vec<String>;
     if let Some(raw_s) = b64d(s, url, true).await{
         l_data = raw_s.lines().map(|c| c.to_string()).filter(|x|x.trim().len()>0).collect();
         trace!("{worker_name} after split to lines.len={}, url={url}", l_data.len());
@@ -32,12 +32,18 @@ pub async fn data2node_one(worker_name: &String, s: &String, url: &String, node_
     }
 
     let mut nr = 0;
-    for (_i, _data) in l_data.iter().enumerate() {
+    for (_i, mut _data) in l_data.iter_mut().enumerate() {
         // debugonly
         // if _i >= 50{
         //     warn!("{} debug break", worker_name);
         //     break;
         // }
+
+        // 检查是否包含htmlentity &amp; 有的话转换为 &
+        if _data.contains("&amp;") {
+            *_data = _data.replace("&amp;", "&");
+        }
+
         let p: Url;
         // trace!("{} processing _data {}", worker_name, _data);
         match Url::parse(_data.as_str()){

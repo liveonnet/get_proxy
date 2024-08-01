@@ -1198,18 +1198,15 @@ async fn dispatch(conf: Arc<Value>,
                         println!("{_i}: {_url}");
                     }
                     let mut s = String::new();
-                    loop {
+                    while pick_index == usize::MAX {
                         s.clear();
                         print!("select by index:");
                         let _ = stdout().flush();
                         match stdin().read_line(&mut s){
                             Ok(_) => {
-                                s = s.trim().to_string();
-                                // println!("you typed {s}");
-                                if let Ok(n) = s.parse(){
+                                if let Ok(n) = s.trim().to_string().parse(){
                                     if n < urls.len() {
                                         pick_index = n;
-                                        break;
                                     }else{
                                         println!("out of index!");
                                     }
