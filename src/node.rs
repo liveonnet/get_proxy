@@ -97,13 +97,10 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
     let mut setting: Value;
     match node.proto.as_str(){
         "vmess"=>{
-            let arg: &serde_json::Map<String, Value>;
-            if let Some(o) = node.param.as_object(){
-                arg = o;
-            }else{
+            let Some(arg) = node.param.as_object() else {
                 error!("{worker_name} node.param convert to hashmap failed!!! param={}", node.param);
                 return None;
-            }
+            };
             let mut outbounds_setting = conf["outboundsSetting_vmess"].clone();
             if arg.contains_key("add"){
                 outbounds_setting[0]["settings"]["vnext"][0]["address"] = arg["add"].clone();
@@ -160,13 +157,10 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
             setting["outbounds"] = outbounds_setting.clone();
         },
         "vless"=>{
-            let arg: &serde_json::Map<String, Value>;
-            if let Some(o) = node.param.as_object(){
-                arg = o;
-            }else{
+            let Some(arg) = node.param.as_object() else {
                 error!("{worker_name} node.param convert to hashmap failed!!! param={}", node.param);
                 return None;
-            }
+            };
             let mut outbounds_setting = conf["outboundsSetting_vless"].clone();
             outbounds_setting[0]["settings"]["vnext"][0]["address"] = Value::from(node.ip.clone());
             outbounds_setting[0]["settings"]["vnext"][0]["port"] = Value::from(node.port);
@@ -295,13 +289,10 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
             setting["outbounds"] = outbounds_setting.clone();
         },
         "trojan"=>{
-            let arg: &serde_json::Map<String, Value>;
-            if let Some(o) = node.param.as_object(){
-                arg = o;
-            }else{
+            let Some(arg) = node.param.as_object() else {
                 error!("{worker_name} node.param convert to hashmap failed!!! param={}", node.param);
                 return None;
-            }
+            };
             let mut outbounds_setting = conf["outboundsSetting_trojan"].clone();
             outbounds_setting[0]["settings"]["servers"][0]["address"] = Value::from(node.real_ip.clone());
             outbounds_setting[0]["settings"]["servers"][0]["port"] = Value::from(node.port);
@@ -332,13 +323,10 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
             setting["outbounds"] = outbounds_setting.clone();
         },
         "ss"=>{
-            let arg: &serde_json::Map<String, Value>;
-            if let Some(o) = node.param.as_object(){
-                arg = o;
-            }else{
+            let Some(arg) = node.param.as_object() else {
                 error!("{worker_name} node.param convert to hashmap failed!!! param={}", node.param);
                 return None;
-            }
+            };
             let mut outbounds_setting = conf["outboundsSetting_ss"].clone();
             // outbounds_setting[0]["settings"]["servers"][0]["address"] = Value::from(node.real_ip.clone());
             outbounds_setting[0]["settings"]["servers"][0]["address"] = Value::from(node.ip.clone());

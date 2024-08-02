@@ -105,13 +105,11 @@ pub fn read_file(file_path: &str) -> Option<String>{
         return None;
     }
     let mut s = String::new();
-    if let Ok(mut f) = File::open(path.as_path()){
-        f.read_to_string(&mut s).unwrap_or_default();
-    }
-    else{
+    let Ok(mut f) = File::open(path.as_path()) else {
         error!("fail to load file {path:?}");
         return None;
-    }
+    };
+    f.read_to_string(&mut s).unwrap_or_default();
     debug!("read {} bytes from file {:?}", s.len(), remove_extended_prefix(&path));
 
     Some(s)
