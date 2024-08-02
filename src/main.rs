@@ -1110,59 +1110,72 @@ async fn dispatch(conf: Arc<Value>,
                 ];
 
                 // mibei url
-                let url_out_c = url_out.clone();
-                let pick_one_c = pick_one.clone();
-                let mut urls_c = urls.clone();
-                tokio::spawn(async move{
+                if pick_one {
                     let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
                     if mibei_url.len() > 0 {
-                        if pick_one_c {
-                            urls_c.push(mibei_url);
-                        }else{
+                        urls.push(mibei_url);
+                        debug!("{worker_name} mibei url added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
+                        if mibei_url.len() > 0 {
                             if let Err(e) = url_out_c.send(mibei_url).await{
                                 error!("{worker_name} put url failed!!! {e}");
                             }
+                            debug!("{worker_name} mibei urls added.");
                         }
-                    }
-                });
+                    });
+                }
 
                 // shareclash urls
-                let url_out_c = url_out.clone();
-                let pick_one_c = pick_one.clone();
-                let mut urls_c = urls.clone();
-                tokio::spawn(async move{
+                if pick_one {
                     let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
                     if shareclash_urls.len() > 0 {
                         for url in shareclash_urls {
-                            if pick_one_c {
-                                urls_c.push(url);
-                            }else{
+                            urls.push(url);
+                        }
+                        debug!("{worker_name} shareclash urls added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
+                        if shareclash_urls.len() > 0 {
+                            for url in shareclash_urls {
                                 if let Err(e) = url_out_c.send(String::from(url)).await{
                                     error!("{worker_name} put url failed!!! {e}");
                                 }
                             }
+                            debug!("{worker_name} shareclash urls added.");
                         }
-                    }
-                });
+                    });
+                }
 
                 // v2rayclashnode urls
-                let url_out_c = url_out.clone();
-                let pick_one_c = pick_one.clone();
-                let mut urls_c = urls.clone();
-                tokio::spawn(async move{
+                if pick_one {
                     let l_urls = proto::get_v2rayclashnode_url(worker_name).await.unwrap_or_default();
                     if l_urls.len() > 0 {
                         for url in l_urls {
-                            if pick_one_c {
-                                urls_c.push(url);
-                            }else{
+                            urls.push(url);
+                        }
+                        debug!("{worker_name} v2rayclashnode urls added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let l_urls = proto::get_v2rayclashnode_url(worker_name).await.unwrap_or_default();
+                        if l_urls.len() > 0 {
+                            for url in l_urls {
                                 if let Err(e) = url_out_c.send(String::from(url)).await{
                                     error!("{worker_name} put url failed!!! {e}");
                                 }
                             }
+                            debug!("{worker_name} v2rayclashnode urls added.");
                         }
-                    }
-                });
+                    });
+                }
 
                 // 打乱顺序
                 if !pick_one {
@@ -1198,18 +1211,17 @@ async fn dispatch(conf: Arc<Value>,
                         println!("{_i}: {_url}");
                     }
                     let mut s = String::new();
-                    while pick_index == usize::MAX {
+                    pick_index = loop {
                         s.clear();
-                        print!("select by index:");
+                        print!("select by index(0-{}):", urls.len() - 1);
                         let _ = stdout().flush();
                         match stdin().read_line(&mut s){
                             Ok(_) => {
                                 if let Ok(n) = s.trim().to_string().parse(){
                                     if n < urls.len() {
-                                        pick_index = n;
-                                    }else{
-                                        println!("out of index!");
+                                        break n;
                                     }
+                                    println!("out of index!");
                                 }else{
                                     println!("bad input!");
                                 }
@@ -1218,7 +1230,7 @@ async fn dispatch(conf: Arc<Value>,
                                 error!("got error {e}");
                             }
                         }
-                    }
+                    };
                 }
 
                 if pick_index != usize::MAX {
