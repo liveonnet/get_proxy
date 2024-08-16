@@ -1107,6 +1107,13 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/linzjian666/chromego_extractor/main/outputs/clash_meta.yaml"),
+
+                    // 如下5个好像最终地址都一样
+                    String::from("https://cdn.jsdelivr.net/gh/a2470982985/getNode@main/v2ray.txt"),    // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
+                    format!("https://good.john1959.com/v2ray@a/{}-list-1.txt", yesterday.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
+                    format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", yesterday.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
+                    format!("https://good.john1959.com/v2ray@a/{}-list-1.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
+                    format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
                 ];
 
                 // mibei url
