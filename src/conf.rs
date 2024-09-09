@@ -30,6 +30,7 @@ pub fn load_config(file_path: &str) -> Option<Value>{
     conf["inboundsSetting"][3]["listen"] = conf["proxy_host"].clone();
     conf["inboundsSetting"][3]["port"] = Value::Number((conf["proxy_socks_port"].as_u64().unwrap_or_default() + 1).into());
 
+    // 目前为止这个配置项没有使用
     conf["proxies"]["http://"] = Value::String(format!("http://{}:{}/", conf["proxy_host"].as_str().unwrap_or_default(), conf["proxy_port"].as_u64().unwrap_or_default()).to_string());
 
     if env::consts::OS == "windows"{

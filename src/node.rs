@@ -344,14 +344,14 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
         }
     }
 
-    if measure_mode && !setting.is_null(){
+    if measure_mode && !setting.is_null(){  // 测试模式
         // debug!("{} in measure_mode, adjust inbounds ...\norg: {}", worker_name, serde_json::to_string_pretty(&setting["inbounds"]).unwrap_or_default());
         match setting["inbounds"].as_array_mut(){
             Some(o)=>{
                 o.swap_remove(0);
                 o.swap_remove(0);
                 o.remove(1);
-                o[0]["listen"] = json!("127.0.0.1");
+                o[0]["listen"] = json!("127.0.0.1");  // 测试模式下只使用本地回环地址
                 o[0]["port"] = json!(port);
                 setting["routing"] = json!(
                     {"domainStrategy": "AsIs",
@@ -367,7 +367,7 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
             }
         }
     }
-    if !measure_mode && !setting.is_null(){
+    if !measure_mode && !setting.is_null(){  // 正式模式
         if conf["proxy_output_file"] != Value::Null{  // v2ray的日志输出
             setting["log"]["access"] = conf["proxy_output_file"].clone();
             setting["log"]["error"] = conf["proxy_output_file"].clone();

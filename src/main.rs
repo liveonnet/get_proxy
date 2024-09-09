@@ -768,6 +768,8 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
     let worker_name = "[service]";
     let mut pid: u32;
     let mut exit_flag = false;
+    let mut cur_ip = tools::get_lan_ip();
+    let mut mconf = Value::clone(&conf);
     // set default headers
     let mut headers = header::HeaderMap::new();
     if let Value::Object(_m) = conf["headers"].clone(){
@@ -804,7 +806,17 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                     }
                     
                 }else{
-                    let (mut child, file_path) = match launcher::launcher_proxy(worker_name, &_node, &conf, port, false).await{
+                    let ip = tools::get_lan_ip();  // 重新获取最新ip
+                    if cur_ip != ip {
+                        info!("ip changed {cur_ip} -> {ip}");
+                        cur_ip = ip;
+                        mconf["inboundsSetting"][0]["listen"] = Value::String(cur_ip.clone());
+                        mconf["inboundsSetting"][1]["listen"] = Value::String(cur_ip.clone());
+                        mconf["inboundsSetting"][2]["listen"] = Value::String(cur_ip.clone());
+                        mconf["inboundsSetting"][3]["listen"] = Value::String(cur_ip.clone());
+                        mconf["proxies"]["http://"] = Value::String(format!("http://{cur_ip}:{port}/"));
+                    }
+                    let (mut child, file_path) = match launcher::launcher_proxy(worker_name, &_node, &mconf, port, false).await{
                         Some((a,b))=>{(a,b)},
                         None=>{
                             error!("{worker_name} service launch proxy failed!!! {_node}");

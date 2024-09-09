@@ -1,6 +1,7 @@
 use std::time;
 use std::time::Duration;
 use std::fs::File;
+#[allow(unused_imports)]
 use std::fs::copy;
 use std::io::Write;
 use std::path::PathBuf;
@@ -160,12 +161,13 @@ async fn wait_start(worker_name: &str, node: &Node, child: &mut Child, file_path
                     break;
                 },
                 Ok(Ok(0)) => {
-                    if let Some(ref cf) = file_path {
-                        let to_file = format!("{cf}.eof");
-                        match copy(cf, to_file.as_str()) {
-                            Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
-                            Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
-                        }
+                    // if let Some(ref cf) = file_path {
+                    if false {
+                        // let to_file = format!("{cf}.eof");
+                        // match copy(cf, to_file.as_str()) {
+                        //     Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
+                        //     Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
+                        // }
                     } else {
                         warn!("{worker_name} {node} pid {pid} read stdout reached EOF");
                     }
