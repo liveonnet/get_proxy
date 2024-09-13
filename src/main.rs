@@ -809,7 +809,13 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                     let ip = tools::get_lan_ip();  // 重新获取最新ip
                     if cur_ip != ip {
                         info!("ip changed {cur_ip} -> {ip}");
+                        if ip == "0.0.0.0" {
+                            warn!("network down ?");
+                        } else if cur_ip == "0.0.0.0" {
+                            warn!("network up ?");
+                        }
                         cur_ip = ip;
+                        mconf["proxy_host"] = Value::String(cur_ip.clone());
                         mconf["inboundsSetting"][0]["listen"] = Value::String(cur_ip.clone());
                         mconf["inboundsSetting"][1]["listen"] = Value::String(cur_ip.clone());
                         mconf["inboundsSetting"][2]["listen"] = Value::String(cur_ip.clone());
@@ -1126,6 +1132,7 @@ async fn dispatch(conf: Arc<Value>,
                     format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", yesterday.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
                     format!("https://good.john1959.com/v2ray@a/{}-list-1.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
                     format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt"),
                 ];
 
                 // mibei url
