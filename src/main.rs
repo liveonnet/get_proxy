@@ -1133,6 +1133,11 @@ async fn dispatch(conf: Arc<Value>,
                     format!("https://good.john1959.com/v2ray@a/{}-list-1.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
                     format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt"),
+                    String::from("https://q3dlaxpoaq.github.io/APIs/cg0.txt"),
+                    String::from("https://q3dlaxpoaq.github.io/APIs/cg1.txt"),
+                    String::from("https://q3dlaxpoaq.github.io/APIs/cg2.txt"),
+                    String::from("https://q3dlaxpoaq.github.io/APIs/cg3.txt"),
+                    String::from("https://q3dlaxpoaq.github.io/APIs/cg4.txt"),
                 ];
 
                 // mibei url
