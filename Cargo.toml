@@ -8,6 +8,7 @@ codegen-units = 1  # 减少并行代码生成单元以提高优化
 lto = true  # 启用链接时优化
 opt-level = "z"  #  二进制文件大小优化
 strip = true  # 自动从二进制文件去除符号信息.
+panic = "abort"  # 恐慌时直接终止，减少错误处理代码
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
