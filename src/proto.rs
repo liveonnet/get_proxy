@@ -15,6 +15,7 @@ use crate::tools;
 use crate::tools::b64d;
 // use crate::tools::check_addr;
 use async_channel::Sender;
+use chrono;
 
 pub async fn data2node_one(worker_name: &String, s: &String, url: &String, node_out: &Sender<Node>) -> () {
     let mut l_data: Vec<String>;
@@ -623,6 +624,39 @@ pub async fn get_v2rayclashnode_url(worker_name: &str) -> Option<Vec<String>>{
         for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
             trace!("{worker_name} got url {}", _url);
             ret.push(String::from(_url));
+        } 
+        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
+    }
+
+    Some(ret)
+}
+
+// 直接返回"trjan:://xxxx"形式的节点列表
+pub async fn get_sharkdoor_url(worker_name: &str) -> Option<Vec<(String, String)>>{
+    let s_lasthour = (chrono::Local::now() - chrono::Duration::hours(1)).format("%Y-%m/%d日%H时30分.md").to_string();
+    let s_url = String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/sharkDoor/vpn-free-nodes/refs/heads/master/node-list/") + s_lasthour.as_str();
+    let url = s_url.as_str();
+    let mut ret = vec![];
+    let mut content = String::new();
+    match reqwest::get(url).await {
+        Ok(o) => {
+            if let Ok(s) = o.text().await {
+                trace!("{worker_name} got {} byte(s) from {url}", s.len());
+                content = String::from(s);
+            } else {
+                warn!("{worker_name} can't get content from {url} !!!");
+            }
+        },
+        Err(e) => {
+            trace!("{worker_name} fetching {url} got err {e}");
+        }
+    }
+
+    if let Some(idx) = content.find("链接|") {
+        let re = Regex::new(r"(?im)\|(trojan:\/\/.+?)\|$").unwrap();
+        for (_, [_node]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
+            trace!("{worker_name} got url {}", _node);
+            ret.push((String::from(url), String::from(_node)));
         } 
         trace!("{worker_name} got {} url(s) content from {url}", ret.len());
     }

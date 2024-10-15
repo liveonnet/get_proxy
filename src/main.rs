@@ -227,14 +227,15 @@ async fn main() {
     let conf_string = serde_json::to_string_pretty(&conf).unwrap_or_default();
     trace!("conf content:\n{}", conf_string);
     let e_exit: Arc<Notify> = Arc::new(Notify::new());
+    let e_ip_changed: Arc<Notify> = Arc::new(Notify::new());
     let conf_c = Arc::new(conf);
 
     // 监听程序退出信号
     tokio::spawn(ctrl_c_handler(e_exit.clone()));
 
     // 开启 pac 服务
-    tokio::spawn(pac_server(conf_c.clone(), e_exit.clone()));
-    let _ = do_all(conf_c.clone(), &e_exit, *measure_mode, *pick_one).await;
+    tokio::spawn(pac_server(conf_c.clone(), e_ip_changed.clone(), e_exit.clone()));
+    let _ = do_all(conf_c.clone(), &e_ip_changed, &e_exit, *measure_mode, *pick_one).await;
     info!("exit.");
 }
 
@@ -269,7 +270,7 @@ async fn ctrl_c_handler(e_exit: Arc<Notify>){
 
 // 处理过程：
 // url -从链接取数据-> data -解析数据构造Node节点-> node -对节点中的域名进行解析获取ip地址-> ip -根据节点ip获取地区信息并过滤-> area -对节点进行排重-> uniq -对节点进行tcp链接测试-> good -对节点进行真实连接进行测试-> candidate -做为备用项使用
-async fn do_all(conf: Arc<Value>, e_exit: &Arc<Notify>, measure_mode: bool, pick_one: bool) -> MyResult<String> {
+async fn do_all(conf: Arc<Value>, e_ip_changed: &Arc<Notify>, e_exit: &Arc<Notify>, measure_mode: bool, pick_one: bool) -> MyResult<String> {
     let b_stop_process = Arc::new(RwLock::new(false));
     let (url_out, url_in) = bounded(5);
     let (data_out, data_in) = bounded(5);
@@ -341,7 +342,7 @@ async fn do_all(conf: Arc<Value>, e_exit: &Arc<Notify>, measure_mode: bool, pick
     tokio::spawn(filter_bad_ip(uniq_in.clone(), good_out.clone(), e_exit.clone(), b_stop_process.clone()));
     tokio::spawn(measure_node(good_in.clone(), candidate_out.clone(), e_candidate_change.clone(), e_exit.clone(), conf.clone(), b_stop_process.clone()));
 
-    service(conf.clone(), candidate_in.clone(), e_candidate_change.clone(), e_exit.clone(), measure_mode).await;
+    service(conf.clone(), candidate_in.clone(), e_candidate_change.clone(), e_ip_changed.clone(), e_exit.clone(), measure_mode).await;
 
     debug!("do_all done!!!!");
     Ok(String::from("done."))
@@ -764,7 +765,7 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
     info!("{worker_name} done.");
 }
 
-async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receiver<Node, u32>, e_candidate_change: Arc<Notify>, e_exit: Arc<Notify>, measure_mode: bool){
+async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receiver<Node, u32>, e_candidate_change: Arc<Notify>, e_ip_changed: Arc<Notify>, e_exit: Arc<Notify>, measure_mode: bool){
     let worker_name = "[service]";
     let mut pid: u32;
     let mut exit_flag = false;
@@ -814,6 +815,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                         } else if cur_ip == "0.0.0.0" {
                             warn!("network up ?");
                         }
+                        e_ip_changed.notify_waiters();
                         cur_ip = ip;
                         mconf["proxy_host"] = Value::String(cur_ip.clone());
                         mconf["inboundsSetting"][0]["listen"] = Value::String(cur_ip.clone());
@@ -1097,8 +1099,9 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/ss"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/hkpc/V2ray-Configs/main/All_Configs_base64_Sub.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/m3hdio1/v2ray_sub/main/v2ray_sub.txt"),
-                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/clash-meta/all.yaml"), 
-                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
+//                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/clash-meta/all.yaml"), 
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/all.txt"),
+//                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
                     String::from("https://uploadserver.sialkcable.ir/v2ray/config.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Memory2314/VMesslinks/main/links/vmess"),
@@ -1208,6 +1211,7 @@ async fn dispatch(conf: Arc<Value>,
                     });
                 }
 
+
                 // 打乱顺序
                 if !pick_one {
                     urls = tokio::task::block_in_place(||{
@@ -1218,7 +1222,7 @@ async fn dispatch(conf: Arc<Value>,
                     });
                 }
 
-                // tolinkshare and vpnnet data
+                // tolinkshare, vpnnet, sharkdoor data
                 if !pick_one{
                     let data_out_c = data_out.clone();
                     tokio::spawn(async move {
@@ -1230,6 +1234,17 @@ async fn dispatch(conf: Arc<Value>,
                                     error!("{worker_name} put data failed!!! {e}");
                                 }
                             }
+                        }
+
+                        // 获取几个节点
+                        let l_node = proto::get_sharkdoor_url(worker_name).await.unwrap_or_default();
+                        if l_node.len() > 0 {
+                            for node in l_node {
+                                if let Err(e) = data_out_c.send(node).await{
+                                    error!("{worker_name} put data failed!!! {e}");
+                                }
+                            }
+                            debug!("{worker_name} sharkdoor urls added to urls.");
                         }
                     });
                 }else{
@@ -1365,17 +1380,17 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, futures::channel::mpsc
     Ok((watcher, rx))
 }
 
-async fn pac_server(conf: Arc<Value>, e_exit: Arc<Notify>){
+async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Notify>){
     let worker_name = "[pac]";
-    let proxy_host = conf["proxy_host"].as_str().unwrap_or_default();
+    let mut proxy_host = conf["proxy_host"].as_str().unwrap_or_default().to_string();  // 只作为初始的ip使用，后续如果ip变更，会动态获取新ip
     let proxy_port: u64 = conf["proxy_port"].as_u64().unwrap_or_default() + 1;
-    let s_addr = format!("{}:{}", proxy_host, conf["pac_server_port"]);
-    let addr = s_addr.to_socket_addrs().unwrap().next().unwrap();
+    let mut s_addr = format!("{}:{}", proxy_host, conf["pac_server_port"]);
+    let mut addr = s_addr.to_socket_addrs().unwrap().next().unwrap();
     let file_path = conf["pac_server_file"].as_str().unwrap_or_default();
     let mut file_content = String::new();
     if let Some(mut s) = tools::read_file(file_path){
         trace!("{worker_name} file read from {file_path}");
-        s = s.replace("{proxy_host}", proxy_host).replace("{proxy_port}", proxy_port.to_string().as_str());
+        s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
         trace!("{worker_name} {file_path}:\n{s}");
         file_content = s;
     } else {
@@ -1387,7 +1402,7 @@ async fn pac_server(conf: Arc<Value>, e_exit: Arc<Notify>){
     watcher.watch(watch_dir, RecursiveMode::NonRecursive).unwrap();
     let mut last_reload = time::Instant::now();
 
-    let listener = TcpListener::bind(addr).await.unwrap();
+    let mut listener = TcpListener::bind(addr).await.unwrap();
 
     let mut exit_flag = false;
     info!("{worker_name} pac server started at {s_addr}");
@@ -1398,11 +1413,27 @@ async fn pac_server(conf: Arc<Value>, e_exit: Arc<Notify>){
                 info!("{worker_name} got exit flag");
                 exit_flag = true;
             },
+            _ = e_ip_changed.notified() => {
+                proxy_host = tools::get_lan_ip();
+                s_addr = format!("{}:{}", proxy_host, conf["pac_server_port"]);
+                addr = s_addr.to_socket_addrs().unwrap().next().unwrap();
+                listener = TcpListener::bind(addr).await.unwrap();
+                info!("{worker_name} notified ip changed, pac server listened on {s_addr}");
+                // ip改变，则pac js里面的ip做同样的改变，目前没想好ip为0.0.0.0也就是断网的时候做什么处理
+                if let Some(mut s) = tools::read_file(file_path){
+                    s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
+                    file_content = s;
+                    info!("{worker_name} file reloaded. {file_path}");
+                    last_reload = time::Instant::now();
+                } else {
+                    error!("{worker_name} file reload failed!!!");
+                }
+            },
             Some(e) = rx.next() => {  // auto reload file on modification
                 debug!("{worker_name} detected {:?} {:?}", e.kind, e.paths);
                 if e.paths.len() > 0 && e.paths[0].as_path() == Path::new(file_path) && last_reload.elapsed() > time::Duration::from_secs(2) {
                     if let Some(mut s) = tools::read_file(file_path){
-                        s = s.replace("{proxy_host}", proxy_host).replace("{proxy_port}", proxy_port.to_string().as_str());
+                        s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
                         file_content = s;
                         info!("{worker_name} file reloaded. {file_path}");
                         last_reload = time::Instant::now();
