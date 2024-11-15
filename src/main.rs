@@ -1141,6 +1141,25 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://q3dlaxpoaq.github.io/APIs/cg2.txt"),
                     String::from("https://q3dlaxpoaq.github.io/APIs/cg3.txt"),
                     String::from("https://q3dlaxpoaq.github.io/APIs/cg4.txt"),
+
+
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/acymz/AutoVPN/main/data/V2.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/HakurouKen/free-node/main/public"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg0.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg1.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg2.txt"),
+                    // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg3.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg4.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub1.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub2.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub3.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub4.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub5.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub6.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub7.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub8.txt"),
+                    // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub9.txt"),
+                    // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub10.txt"),
                 ];
 
                 // mibei url
