@@ -1230,6 +1230,53 @@ async fn dispatch(conf: Arc<Value>,
                     });
                 }
 
+                // freev2rayclash urls
+                if pick_one {
+                    let l_urls = proto::get_freev2rayclash_url(worker_name).await.unwrap_or_default();
+                    if l_urls.len() > 0 {
+                        for url in l_urls {
+                            urls.push(url);
+                        }
+                        debug!("{worker_name} freev2rayclash urls added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let l_urls = proto::get_freev2rayclash_url(worker_name).await.unwrap_or_default();
+                        if l_urls.len() > 0 {
+                            for url in l_urls {
+                                if let Err(e) = url_out_c.send(String::from(url)).await{
+                                    error!("{worker_name} put url failed!!! {e}");
+                                }
+                            }
+                            debug!("{worker_name} freev2rayclash urls added.");
+                        }
+                    });
+                }
+
+                // freev2ray urls
+                if pick_one {
+                    let l_urls = proto::get_freev2ray_url(worker_name).await.unwrap_or_default();
+                    if l_urls.len() > 0 {
+                        for url in l_urls {
+                            urls.push(url);
+                        }
+                        debug!("{worker_name} freev2ray urls added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let l_urls = proto::get_freev2ray_url(worker_name).await.unwrap_or_default();
+                        if l_urls.len() > 0 {
+                            for url in l_urls {
+                                if let Err(e) = url_out_c.send(String::from(url)).await{
+                                    error!("{worker_name} put url failed!!! {e}");
+                                }
+                            }
+                            debug!("{worker_name} freev2ray urls added.");
+                        }
+                    });
+                }
 
                 // 打乱顺序
                 if !pick_one {
