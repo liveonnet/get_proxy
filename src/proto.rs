@@ -691,6 +691,35 @@ pub async fn get_freev2ray_url(worker_name: &str) -> Option<Vec<String>>{
     Some(ret)
 }
 
+pub async fn get_windowsv2ray_url(worker_name: &str) -> Option<Vec<String>>{
+    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md";
+    let mut ret = vec![];
+    let mut content = String::new();
+    match reqwest::get(url).await {
+        Ok(o) => {
+            if let Ok(s) = o.text().await {
+                trace!("{worker_name} got {} byte(s) from {url}", s.len());
+                content = String::from(s);
+            } else {
+                warn!("{worker_name} can't get content from {url} !!!");
+            }
+        },
+        Err(e) => {
+            trace!("{worker_name} fetching {url} got err {e}");
+        }
+    }
+
+    if let Some(idx) = content.find("V2ray订阅链接") {
+        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
+        for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
+            trace!("{worker_name} got url {}", _url);
+            ret.push(String::from(_url));
+        } 
+        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
+    }
+
+    Some(ret)
+}
 
 // 直接返回"trjan:://xxxx"形式的节点列表
 pub async fn get_sharkdoor_url(worker_name: &str) -> Option<Vec<(String, String)>>{

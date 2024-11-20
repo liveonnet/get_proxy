@@ -1160,6 +1160,7 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub8.txt"),
                     // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub9.txt"),
                     // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub10.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Vauth/node/main/Main"),
                 ];
 
                 // mibei url
@@ -1274,6 +1275,30 @@ async fn dispatch(conf: Arc<Value>,
                                 }
                             }
                             debug!("{worker_name} freev2ray urls added.");
+                        }
+                    });
+                }
+
+                // windowsv2ray urls
+                if pick_one {
+                    let l_urls = proto::get_windowsv2ray_url(worker_name).await.unwrap_or_default();
+                    if l_urls.len() > 0 {
+                        for url in l_urls {
+                            urls.push(url);
+                        }
+                        debug!("{worker_name} windowsv2ray urls added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let l_urls = proto::get_windowsv2ray_url(worker_name).await.unwrap_or_default();
+                        if l_urls.len() > 0 {
+                            for url in l_urls {
+                                if let Err(e) = url_out_c.send(String::from(url)).await{
+                                    error!("{worker_name} put url failed!!! {e}");
+                                }
+                            }
+                            debug!("{worker_name} windowsv2ray urls added.");
                         }
                     });
                 }
