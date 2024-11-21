@@ -571,14 +571,13 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)>{
     Some(ret)
 }
 
-pub async fn get_shareclash_url(worker_name: &str) -> Option<Vec<String>>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md";
+pub async fn get_githubreadme_url(worker_name: &str, url: &str, begin_str: &str, regex_str: &str) -> Option<Vec<String>>{
     let mut ret = vec![];
     let mut content = String::new();
-    match reqwest::get(url).await {
+    match reqwest::get(url).await{
         Ok(o) => {
             if let Ok(s) = o.text().await {
-                trace!("{worker_name} got {} byte(s) from {url}", s.len());
+                trace!("{worker_name} get {} bytes from {url}", s.len());
                 content = String::from(s);
             } else {
                 warn!("{worker_name} can't get content from {url} !!!");
@@ -589,128 +588,8 @@ pub async fn get_shareclash_url(worker_name: &str) -> Option<Vec<String>>{
         }
     }
 
-    if let Some(idx) = content.find("V2ray订阅链接") {
-        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
-        for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
-            trace!("{worker_name} got url {}", _url);
-            ret.push(String::from(_url));
-        } 
-        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
-    }
-
-    Some(ret)
-}
-
-pub async fn get_v2rayclashnode_url(worker_name: &str) -> Option<Vec<String>>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/v2rayclashnode/v2rayclashnode.github.io/main/README.md";
-    let mut ret = vec![];
-    let mut content = String::new();
-    match reqwest::get(url).await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
-                trace!("{worker_name} got {} byte(s) from {url}", s.len());
-                content = String::from(s);
-            } else {
-                warn!("{worker_name} can't get content from {url} !!!");
-            }
-        },
-        Err(e) => {
-            trace!("{worker_name} fetching {url} got err {e}");
-        }
-    }
-
-    if let Some(idx) = content.find("V2ray订阅链接") {
-        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
-        for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
-            trace!("{worker_name} got url {}", _url);
-            ret.push(String::from(_url));
-        } 
-        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
-    }
-
-    Some(ret)
-}
-
-pub async fn get_freev2rayclash_url(worker_name: &str) -> Option<Vec<String>>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md";
-    let mut ret = vec![];
-    let mut content = String::new();
-    match reqwest::get(url).await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
-                trace!("{worker_name} got {} byte(s) from {url}", s.len());
-                content = String::from(s);
-            } else {
-                warn!("{worker_name} can't get content from {url} !!!");
-            }
-        },
-        Err(e) => {
-            trace!("{worker_name} fetching {url} got err {e}");
-        }
-    }
-
-    if let Some(idx) = content.find("V2ray订阅链接") {
-        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
-        for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
-            trace!("{worker_name} got url {}", _url);
-            ret.push(String::from(_url));
-        } 
-        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
-    }
-
-    Some(ret)
-}
-
-pub async fn get_freev2ray_url(worker_name: &str) -> Option<Vec<String>>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md";
-    let mut ret = vec![];
-    let mut content = String::new();
-    match reqwest::get(url).await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
-                trace!("{worker_name} got {} byte(s) from {url}", s.len());
-                content = String::from(s);
-            } else {
-                warn!("{worker_name} can't get content from {url} !!!");
-            }
-        },
-        Err(e) => {
-            trace!("{worker_name} fetching {url} got err {e}");
-        }
-    }
-
-    if let Some(idx) = content.find("V2ray订阅链接") {
-        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
-        for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
-            trace!("{worker_name} got url {}", _url);
-            ret.push(String::from(_url));
-        } 
-        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
-    }
-
-    Some(ret)
-}
-
-pub async fn get_windowsv2ray_url(worker_name: &str) -> Option<Vec<String>>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md";
-    let mut ret = vec![];
-    let mut content = String::new();
-    match reqwest::get(url).await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
-                trace!("{worker_name} got {} byte(s) from {url}", s.len());
-                content = String::from(s);
-            } else {
-                warn!("{worker_name} can't get content from {url} !!!");
-            }
-        },
-        Err(e) => {
-            trace!("{worker_name} fetching {url} got err {e}");
-        }
-    }
-
-    if let Some(idx) = content.find("V2ray订阅链接") {
-        let re = Regex::new(r"(?im)^-\s+(https://.+?\.txt)").unwrap();
+    if let Some(idx) = content.find(begin_str) {
+        let re = Regex::new(regex_str).unwrap();
         for (_, [_url]) in re.captures_iter(&content[idx..]).map(|c| c.extract()) {
             trace!("{worker_name} got url {}", _url);
             ret.push(String::from(_url));

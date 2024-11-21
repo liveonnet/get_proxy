@@ -1161,6 +1161,7 @@ async fn dispatch(conf: Arc<Value>,
                     // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub9.txt"),
                     // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub10.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Vauth/node/main/Main"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
                 ];
 
                 // mibei url
@@ -1183,124 +1184,36 @@ async fn dispatch(conf: Arc<Value>,
                     });
                 }
 
-                // shareclash urls
-                if pick_one {
-                    let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
-                    if shareclash_urls.len() > 0 {
-                        for url in shareclash_urls {
-                            urls.push(url);
-                        }
-                        debug!("{worker_name} shareclash urls added to urls.");
-                    }
-                }else{
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
-                        let shareclash_urls = proto::get_shareclash_url(worker_name).await.unwrap_or_default();
-                        if shareclash_urls.len() > 0 {
-                            for url in shareclash_urls {
-                                if let Err(e) = url_out_c.send(String::from(url)).await{
-                                    error!("{worker_name} put url failed!!! {e}");
-                                }
+                for [_git_name, _url, _begin_str, _regex_str] in [
+                    ["shareclash", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["v2rayclashnode", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/v2rayclashnode/v2rayclashnode.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["freev2rayclash", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["freev2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["windowsv2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["clashfreev2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"]
+                    ] {
+                    if pick_one {
+                        let  one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
+                        if urls.len() > 0 {
+                            for url in one_urls {
+                                urls.push(url);
                             }
-                            debug!("{worker_name} shareclash urls added.");
+                            debug!("{worker_name} {_git_name} urls added to urls.");
                         }
-                    });
-                }
-
-                // v2rayclashnode urls
-                if pick_one {
-                    let l_urls = proto::get_v2rayclashnode_url(worker_name).await.unwrap_or_default();
-                    if l_urls.len() > 0 {
-                        for url in l_urls {
-                            urls.push(url);
-                        }
-                        debug!("{worker_name} v2rayclashnode urls added to urls.");
-                    }
-                }else{
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
-                        let l_urls = proto::get_v2rayclashnode_url(worker_name).await.unwrap_or_default();
-                        if l_urls.len() > 0 {
-                            for url in l_urls {
-                                if let Err(e) = url_out_c.send(String::from(url)).await{
-                                    error!("{worker_name} put url failed!!! {e}");
+                    } else {
+                        let url_out_c = url_out.clone();
+                        tokio::spawn(async move{
+                            let one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
+                            if one_urls.len() > 0 {
+                                for url in one_urls {
+                                    if let Err(e) = url_out_c.send(String::from(url)).await{
+                                        error!("{worker_name} put url failed!!! {e}");
+                                    }
                                 }
+                                debug!("{worker_name} {_git_name} urls added.");
                             }
-                            debug!("{worker_name} v2rayclashnode urls added.");
-                        }
-                    });
-                }
-
-                // freev2rayclash urls
-                if pick_one {
-                    let l_urls = proto::get_freev2rayclash_url(worker_name).await.unwrap_or_default();
-                    if l_urls.len() > 0 {
-                        for url in l_urls {
-                            urls.push(url);
-                        }
-                        debug!("{worker_name} freev2rayclash urls added to urls.");
+                        });
                     }
-                }else{
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
-                        let l_urls = proto::get_freev2rayclash_url(worker_name).await.unwrap_or_default();
-                        if l_urls.len() > 0 {
-                            for url in l_urls {
-                                if let Err(e) = url_out_c.send(String::from(url)).await{
-                                    error!("{worker_name} put url failed!!! {e}");
-                                }
-                            }
-                            debug!("{worker_name} freev2rayclash urls added.");
-                        }
-                    });
-                }
-
-                // freev2ray urls
-                if pick_one {
-                    let l_urls = proto::get_freev2ray_url(worker_name).await.unwrap_or_default();
-                    if l_urls.len() > 0 {
-                        for url in l_urls {
-                            urls.push(url);
-                        }
-                        debug!("{worker_name} freev2ray urls added to urls.");
-                    }
-                }else{
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
-                        let l_urls = proto::get_freev2ray_url(worker_name).await.unwrap_or_default();
-                        if l_urls.len() > 0 {
-                            for url in l_urls {
-                                if let Err(e) = url_out_c.send(String::from(url)).await{
-                                    error!("{worker_name} put url failed!!! {e}");
-                                }
-                            }
-                            debug!("{worker_name} freev2ray urls added.");
-                        }
-                    });
-                }
-
-                // windowsv2ray urls
-                if pick_one {
-                    let l_urls = proto::get_windowsv2ray_url(worker_name).await.unwrap_or_default();
-                    if l_urls.len() > 0 {
-                        for url in l_urls {
-                            urls.push(url);
-                        }
-                        debug!("{worker_name} windowsv2ray urls added to urls.");
-                    }
-                }else{
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
-                        let l_urls = proto::get_windowsv2ray_url(worker_name).await.unwrap_or_default();
-                        if l_urls.len() > 0 {
-                            for url in l_urls {
-                                if let Err(e) = url_out_c.send(String::from(url)).await{
-                                    error!("{worker_name} put url failed!!! {e}");
-                                }
-                            }
-                            debug!("{worker_name} windowsv2ray urls added.");
-                        }
-                    });
                 }
 
                 // 打乱顺序
