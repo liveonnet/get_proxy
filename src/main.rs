@@ -1190,7 +1190,8 @@ async fn dispatch(conf: Arc<Value>,
                     ["freev2rayclash", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ["freev2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ["windowsv2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["clashfreev2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"]
+                    ["clashfreev2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["v2rayclashx", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/v2rayclashx/v2rayclashx.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ] {
                     if pick_one {
                         let  one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
@@ -1436,13 +1437,24 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
             Some(e) = rx.next() => {  // auto reload file on modification
                 debug!("{worker_name} detected {:?} {:?}", e.kind, e.paths);
                 if e.paths.len() > 0 && e.paths[0].as_path() == Path::new(file_path) && last_reload.elapsed() > time::Duration::from_secs(2) {
-                    if let Some(mut s) = tools::read_file(file_path){
-                        s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
-                        file_content = s;
-                        info!("{worker_name} file reloaded. {file_path}");
-                        last_reload = time::Instant::now();
-                    } else {
-                        error!("{worker_name} file reload failed!!!");
+                    let mut try_time = 1;
+                    let max_try = 3;
+                    while try_time <= max_try {
+                        if let Some(mut s) = tools::read_file(file_path){
+                            s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
+                            file_content = s;
+                            if file_content.len() == 0 {
+                                debug!("try {try_time}/{max_try} got 0 byte from {file_path}");
+                            } else {
+                                info!("try {try_time}/{max_try} {worker_name} file reloaded. {file_path} {} byte(s)", file_content.len());
+                                last_reload = time::Instant::now();
+                                break;
+                            }
+                        } else {
+                            error!("try {try_time}/{max_try} {worker_name} file reload failed!!!");
+                        }
+                        try_time += 1;
+                        tokio::time::sleep(Duration::from_millis(500)).await;
                     }
                 }
             },

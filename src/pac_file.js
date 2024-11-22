@@ -32,7 +32,13 @@ var domains = {
     "tube8.com": 1,
     "githubassets.com": 1,
     "imgbox.xyzm": 1,
-    "gateway.ipfsscan.io": 1
+    "dogag.xyz": 1,
+    "gateway.ipfsscan.io": 1,
+    "piicca.com": 1,
+    "cawdz.com": 1,
+    "faalo.xyz": 1,
+    "eporner.com": 1,
+    "javtrailers.com": 1
 };
 
 var proxy = "PROXY {proxy_host}:{proxy_port}; DIRECT;";
