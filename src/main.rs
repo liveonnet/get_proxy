@@ -1162,6 +1162,10 @@ async fn dispatch(conf: Arc<Value>,
                     // String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub10.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Vauth/node/main/Main"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/vmess.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/vless.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/trojan.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/ss.txt"),
                 ];
 
                 // mibei url
@@ -1192,6 +1196,7 @@ async fn dispatch(conf: Arc<Value>,
                     ["windowsv2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ["clashfreev2ray", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ["v2rayclashx", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/v2rayclashx/v2rayclashx.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["v2rayclashnodes", "https://mirror.ghproxy.com/https://raw.githubusercontent.com/v2rayclashnodes/v2rayclashnodes.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ] {
                     if pick_one {
                         let  one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
