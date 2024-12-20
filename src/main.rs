@@ -771,6 +771,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
     let mut exit_flag = false;
     let mut cur_ip = tools::get_lan_ip();
     let mut mconf = Value::clone(&conf);
+    let pick_new_interval_seconds = conf["pick_new_interval_seconds"].as_u64().unwrap_or_else(||86400);
     // set default headers
     let mut headers = header::HeaderMap::new();
     if let Value::Object(_m) = conf["headers"].clone(){
@@ -842,6 +843,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                         .build().unwrap_or_else(|e|{error!("client create failed! {e}"); reqwest::Client::builder().build().unwrap()});
 
                     let mut show_raw = false;
+                    let mut start_time = SystemTime::now();
                     loop{
                         let (nr_maxtry, min_succ) = (3, 2);
                         let (nr_succ, min_latency) = tools::check_proxy(worker_name, &_node, &client, "https://www.youtube.com/@wangzhian/streams", nr_maxtry, min_succ, false, e_exit.clone()).await;
@@ -850,6 +852,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                             if !show_raw {
                                 info!("{worker_name} node raw: {}  source: {}", _node.raw, _node.source);
                                 show_raw = true;
+                                start_time = SystemTime::now();
                             }
                             print!("[{pid}_{min_latency}]");
                             let _ = io::stdout().flush();
@@ -924,7 +927,27 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                                 }
                                 break;
                             },
-                            _ = tokio::time::sleep(Duration::from_secs(120)) => {},
+                            _ = tokio::time::sleep(Duration::from_secs(120)) => {
+                                match SystemTime::now().duration_since(start_time) {
+                                    Ok(duration) => {
+                                        if duration.as_secs() >= pick_new_interval_seconds {
+                                            // 正常运行一段时间后，主动切换切换为新proxy
+                                            info!("{worker_name} proxy already run {} seconds, switch to new one ...", duration.as_secs());
+                                            if let Err(e) = child.kill().await{
+                                                warn!("{worker_name} proxy {pid} kill failed! {e}");
+                                            }
+                                            if !file_path.is_empty(){
+                                                if let Err(e) = tokio::fs::remove_file(file_path).await{
+                                                    error!("{worker_name} file remove failed! {e}");
+                                                };
+                                            }
+                                            break;
+                                        }
+                                    },
+                                    Err(_) => {},
+                                }
+
+                            },
                         }
                     }  // end of loop
                     if exit_flag {
@@ -953,11 +976,12 @@ async fn dispatch(conf: Arc<Value>,
     pick_one: bool) {
     let worker_name = "[dispatch]";
 
-    info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {}\n pick_one: {}",
+    info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n pick_new_interval_seconds: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {}\n pick_one: {}",
         worker_name, conf["v2ray_path"],
         conf["conf_basepath"],
         conf["proxy_host"],
         conf["pac_server_port"],
+        conf["pick_new_interval_seconds"],
         conf["inboundsSetting"][0]["port"],
         conf["inboundsSetting"][1]["port"],
         conf["inboundsSetting"][2]["port"],
@@ -1166,6 +1190,8 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/vless.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/trojan.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/ss.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
                 ];
 
                 // mibei url

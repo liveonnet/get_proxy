@@ -21,6 +21,7 @@
     "v2ray_path_win": "D:/app/v2rayN-With-Core/bin/v2fly_v5/v2ray.exe",
     "v2ray_path_linux": "/usr/local/bin/v2ray",
     "test_wait_milliseconds": 5000,
+    "pick_new_interval_seconds": 86400,
     "proxy_output_file_win": null,
     "proxy_output_file_linux": "/dev/shm/proxy_r.log",
     "proxy_output_file_loglevel": "warning",
