@@ -1192,6 +1192,9 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/ss.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                     String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/v2tel_links2.txt"),
+//                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_Sub.txt"),
+                    String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_base64_Sub.txt"),
                 ];
 
                 // mibei url
