@@ -1195,6 +1195,10 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/v2tel_links2.txt"),
 //                    String::from("https://ghfast.top/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_Sub.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_base64_Sub.txt"),
+
+                    format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", today.year(), today.month(), s_today),
+                    format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
+                    format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", before_yesterday.year(), before_yesterday.month(), s_before_yesterday),
                 ];
 
                 // mibei url
