@@ -785,7 +785,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
     }
     let port: u64 = conf["proxy_port"].as_number().map_or_else(||0, |o|o.as_u64().unwrap_or_default());
     // set proxy
-    let proxy = reqwest::Proxy::all(format!("http://{}:{port}", conf["proxy_host"].as_str().unwrap())).unwrap().basic_auth(conf["proxy_user"].as_str().unwrap(), conf["proxy_pass"].as_str().unwrap());
+    let mut proxy = reqwest::Proxy::all(format!("http://{}:{port}", conf["proxy_host"].as_str().unwrap())).unwrap().basic_auth(conf["proxy_user"].as_str().unwrap(), conf["proxy_pass"].as_str().unwrap());
     debug!("{worker_name} proxy={proxy:?}");
     while !exit_flag{
         tokio::select! {
@@ -824,6 +824,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                         mconf["inboundsSetting"][2]["listen"] = Value::String(cur_ip.clone());
                         mconf["inboundsSetting"][3]["listen"] = Value::String(cur_ip.clone());
                         mconf["proxies"]["http://"] = Value::String(format!("http://{cur_ip}:{port}/"));
+                        proxy = reqwest::Proxy::all(format!("http://{}:{port}", mconf["proxy_host"].as_str().unwrap())).unwrap().basic_auth(mconf["proxy_user"].as_str().unwrap(), mconf["proxy_pass"].as_str().unwrap());
                     }
                     let (mut child, file_path) = match launcher::launcher_proxy(worker_name, &_node, &mconf, port, false).await{
                         Some((a,b))=>{(a,b)},
