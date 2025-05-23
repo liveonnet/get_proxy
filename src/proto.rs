@@ -489,7 +489,7 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<String>{
             Ok(o) => {
                 if let Ok(s) = o.text().await {
                     trace!("{worker_name} got {} bytes from {lastest_url}", s.len());
-                    let re = Regex::new(r"http://mm\.mibei77\.com/.+?\.txt").unwrap();
+                    let re = Regex::new(r"https://mm\.mibei77\.com/.+?\.txt").unwrap();
                     match re.find(&s){
                         Some(x) => {
                             ret = String::from(x.as_str());
@@ -514,7 +514,7 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<String>{
 }
 
 pub async fn get_tolinkshare_data(worker_name: &str) -> Option<(String, String)>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/tolinkshare/freenode/main/README.md";
+    let url = "https://ghfast.top/https://raw.githubusercontent.com/tolinkshare/freenode/main/README.md";
     let mut ret = (String::from(url), String::new());
     let mut content = String::new();
     match reqwest::get(url).await {
@@ -543,7 +543,7 @@ pub async fn get_tolinkshare_data(worker_name: &str) -> Option<(String, String)>
 }
 
 pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)>{
-    let url = "https://mirror.ghproxy.com/https://raw.githubusercontent.com/VpnNetwork01/vpn-net/main/README.md";
+    let url = "https://ghfast.top/https://raw.githubusercontent.com/VpnNetwork01/vpn-net/main/README.md";
     let mut ret = (String::from(url), String::new());
     let mut content = String::new();
     match reqwest::get(url).await {
@@ -603,7 +603,7 @@ pub async fn get_githubreadme_url(worker_name: &str, url: &str, begin_str: &str,
 // 直接返回"trjan:://xxxx"形式的节点列表
 pub async fn get_sharkdoor_url(worker_name: &str) -> Option<Vec<(String, String)>>{
     let s_lasthour = (chrono::Local::now() - chrono::Duration::hours(1)).format("%Y-%m/%d日%H时30分.md").to_string();
-    let s_url = String::from("https://mirror.ghproxy.com/https://raw.githubusercontent.com/sharkDoor/vpn-free-nodes/refs/heads/master/node-list/") + s_lasthour.as_str();
+    let s_url = String::from("https://ghfast.top/https://raw.githubusercontent.com/sharkDoor/vpn-free-nodes/refs/heads/master/node-list/") + s_lasthour.as_str();
     let url = s_url.as_str();
     let mut ret = vec![];
     let mut content = String::new();

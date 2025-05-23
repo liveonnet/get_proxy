@@ -135,13 +135,10 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
                 Value::from(64)
             };
             outbounds_setting[0]["streamSettings"]["wsSettings"]["path"] = arg["path"].clone();
-            outbounds_setting[0]["streamSettings"]["wsSettings"]["headers"] = if arg["host"].as_str().unwrap_or_default().len()==0{
-                json!({})
-            } else{
-                let mut x = serde_json::Map::new();
-                x.insert(String::from("Host"), arg["host"].clone());
-                Value::from(x)
-            };
+            if arg["host"].as_str().unwrap_or_default().len() != 0{
+                outbounds_setting[0]["streamSettings"]["wsSettings"]["Host"] = arg["host"].clone()
+            }
+            // outbounds_setting[0]["streamSettings"]["wsSettings"]["headers"] = json!({});
             outbounds_setting[0]["streamSettings"]["security"] = match arg.get("tls"){
                 Some(o)=>{
                     if o.as_str().unwrap_or_default().len()!=0{
@@ -204,7 +201,8 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
                     outbounds_setting[0]["streamSettings"]["tlsSettings"] = json!({
                         "serverName": arg.get("sni").map_or_else(||Value::from(node.ip.clone()), |o|o.clone()),
                         "allowInsecure": false,
-                        "show": false});
+                        "show": false,
+                        "fingerprint": arg.get("fp").map_or_else(||arg.get("fp").map_or_else(||json!("chrome"), |o|o.clone()), |o|o.clone())});
                     if arg.contains_key("alpn"){
                         outbounds_setting[0]["streamSettings"]["tlsSettings"]["alpn"] = match unquote_plus(arg["alpn"].as_str().unwrap_or_default()){
                             Ok(o)=>{let x:Vec<&str>=o.split(',').collect(); json!(x)},
@@ -245,13 +243,23 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
                 "ws"=>{
                     outbounds_setting[0]["streamSettings"]["tlsSettings"] = json!({
                         "serverName": arg.get("sni").map_or_else(||Value::from(node.ip.clone()), |o|o.clone())
-                        });
+                    });
                     outbounds_setting[0]["streamSettings"]["wsSettings"] = json!({
                         "path": arg["path"],
-                        "headers": {
-                            "Host": arg.get("host").map_or_else(||Value::from(""), |o|o.clone()),
-                            }
-                        });
+                        "Host": arg.get("host").map_or_else(||Value::from(""), |o|o.clone()),
+                        "headers": {}
+                    });
+                },
+                "httpupgrade"=>{
+                    outbounds_setting[0]["streamSettings"]["httpupgradeSettings"] = json!({
+                        "host": arg.get("host").map_or_else(||Value::from(""), |o|o.clone()),
+                        "path": arg.get("path").clone(),
+                    });
+                },
+                "xhttp"=>{
+                    outbounds_setting[0]["streamSettings"]["xhttpSettings"] = json!({
+                        "path": arg.get("path").clone(),
+                    });
                 },
                 "grpc"=>{
                     outbounds_setting[0]["streamSettings"]["grpcSettings"] = json!({

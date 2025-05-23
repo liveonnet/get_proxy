@@ -76,7 +76,11 @@ pub async fn launcher_proxy(worker_name: &str, node: &Node, conf: &Value, port: 
                     // }
 
                     if wait_start(worker_name, &node, &mut child, None, wait_millisecs, false).await {
+                        // trace!("{worker_name} setting: {}", setting.to_string());  // debug only
                         return Some((child, String::new()));
+                    }
+                    else{
+                        // trace!("{worker_name} setting: {}", setting.to_string());  // debug only
                     }
                 }else{
                     error!("{worker_name} get stdin failed!");
@@ -143,7 +147,7 @@ async fn wait_start(worker_name: &str, node: &Node, child: &mut Child, file_path
 
     let pid = child.id().unwrap_or_default();
     if let Some(h_stdout) = child.stdout.take() {
-        let re = Regex::new(r"\[Warning\] V2Ray .+? started").unwrap();
+        let re = Regex::new(r"\[Warning\] core: Xray .+? started").unwrap();
         let mut stdout = BufReader::new(h_stdout);
         let mut line = String::new();
         let now = time::Instant::now();
@@ -170,6 +174,13 @@ async fn wait_start(worker_name: &str, node: &Node, child: &mut Child, file_path
                         // }
                     } else {
                         warn!("{worker_name} {node} pid {pid} read stdout reached EOF");
+                        // if let Some(ref cf) = file_path {
+                        //     let to_file = format!("{cf}.eof");
+                        //     match copy(cf, to_file.as_str()) {
+                        //         Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
+                        //         Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
+                        //     }
+                        // }
                     }
                     ret = false;
                     break;

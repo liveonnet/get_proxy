@@ -1200,6 +1200,9 @@ async fn dispatch(conf: Arc<Value>,
                     format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", today.year(), today.month(), s_today),
                     format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
                     format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", before_yesterday.year(), before_yesterday.month(), s_before_yesterday),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt"),
+                    String::from("http://localhost:8099/hu.txt"),
                 ];
 
                 // mibei url
