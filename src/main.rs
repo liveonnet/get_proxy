@@ -1193,7 +1193,9 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/ss.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/v2tel_links1.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/v2tel_links2.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/last_150.txt"),
 //                    String::from("https://ghfast.top/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_Sub.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_base64_Sub.txt"),
 
@@ -1202,7 +1204,7 @@ async fn dispatch(conf: Arc<Value>,
                     format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", before_yesterday.year(), before_yesterday.month(), s_before_yesterday),
 
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt"),
-                    String::from("http://localhost:8099/hu.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/AzadNetCH/Clash/refs/heads/main/AzadNet.txt"),
                 ];
 
                 // mibei url
