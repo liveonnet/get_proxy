@@ -454,7 +454,7 @@ pub async fn parse_yaml(worker_name: &String, s: &String, url: &String, node_out
         }
     }
     else{
-        error!("{worker_name} get 'proxies' failed! url={url}");  
+        error!("{worker_name} get 'proxies' failed! url={url} data len={}", s.len());  
     }
 }
 
