@@ -16,6 +16,7 @@ use crate::tools::b64d;
 // use crate::tools::check_addr;
 use async_channel::Sender;
 use chrono;
+use html_escape::decode_html_entities;
 
 pub async fn data2node_one(worker_name: &String, s: &String, url: &String, node_out: &Sender<Node>) -> () {
     let mut l_data: Vec<String>;
@@ -468,7 +469,7 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<String>{
             if let Ok(s) = o.text().await {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
                 let doc = Html::parse_document(s.as_str());
-                let sel = Selector::parse("article.blog-post.hentry.index-post.post-0 > div.entry-header > h2.entry-title > a").unwrap();
+                let sel = Selector::parse("#index-tab-main > posts:nth-child(1) > div.item-body.flex.xx.flex1.jsb > h2 > a").unwrap();
                 if let Some(_item) = doc.select(&sel).next(){
                     if let Some(x) = _item.attr("href"){
                         lastest_url = String::from(x);
@@ -512,6 +513,64 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<String>{
 
     Some(ret)
 }
+
+pub async fn get_v2ssr_url(worker_name: &str) -> Option<String>{
+    trace!("{worker_name} try to get v2ssr url...");
+    let url = "https://v2ssr.net/category/freenode-ssr-v2rayn-clash";
+    let mut ret = String::new();
+    let mut lastest_url = String::new();
+    match reqwest::get(url).await {
+        Ok(o) => {
+            if let Ok(s) = o.text().await {
+                trace!("{worker_name} got {} byte(s) from {url}", s.len());
+                let doc = Html::parse_document(s.as_str());
+                let sel = Selector::parse("#wp--skip-link--target > div.wp-block-query.is-layout-flow.wp-block-query-is-layout-flow > ul > li:nth-child(1) h2 > a").unwrap();
+                if let Some(_item) = doc.select(&sel).next(){
+                    if let Some(x) = _item.attr("href"){
+                        lastest_url = String::from(x);
+                        trace!("{worker_name} got url {lastest_url}");
+                    }
+                } else {
+                    warn!("{worker_name} can\'t find lastest page url!!!");
+                }
+            }
+        },
+        Err(e) => {
+            warn!("{worker_name} fetching {url} got err {e}");
+        }
+    }
+
+    if lastest_url.len() > 0{
+        trace!("{worker_name} got {lastest_url}");
+        match reqwest::get(lastest_url.clone()).await{
+            Ok(o) => {
+                if let Ok(s) = o.text().await {
+                    trace!("{worker_name} got {} bytes from {lastest_url}", s.len());
+                    let re = Regex::new(r"https:&#47;&#47;freenode\.v2ssr\.net/.+?\.txt").unwrap();
+                    match re.find(&s){
+                        Some(x) => {
+                            ret = String::from(x.as_str());
+                            ret = decode_html_entities(&ret).to_string();
+                            trace!("{worker_name} got v2ssr url {ret}");
+                        },
+                        None => {
+                            warn!("{worker_name} can't found v2ssr url");
+                        }
+                    };
+                } else {
+                    warn!("{worker_name} can't get content from {lastest_url} !!!");
+                }
+
+            },
+            Err(e) => {
+                warn!("{worker_name} can't get content from {lastest_url}, err: {e} !!!");
+            }
+        }
+    }
+
+    Some(ret)
+}
+
 
 pub async fn get_tolinkshare_data(worker_name: &str) -> Option<(String, String)>{
     let url = "https://ghfast.top/https://raw.githubusercontent.com/tolinkshare/freenode/main/README.md";

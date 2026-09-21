@@ -272,7 +272,7 @@
                         "ota": false,
                         "password": null,
                         "port": null,
-                        "level": 1
+                        "level": 0
                     }
                 ]
             },
@@ -311,7 +311,7 @@
                         "port": null,
                         "password": null,
                         "ota": false,
-                        "level": 1
+                        "level": 0
                     }
                 ]
             },

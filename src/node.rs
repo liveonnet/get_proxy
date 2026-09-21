@@ -144,10 +144,10 @@ pub fn create_proxy_conf(worker_name: &str, node: &Node, conf: &Value, port: u64
                     if o.as_str().unwrap_or_default().len()!=0{
                         o.clone()
                     }else{
-                        Value::from("none")
+                        Value::from("auto")
                     }
                 },
-                None=>Value::from("none")
+                None=>Value::from("auto")
             };
             setting = conf["conf_tpl"].clone();
             setting["inbounds"] = conf["inboundsSetting"].clone();

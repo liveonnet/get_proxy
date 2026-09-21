@@ -67,7 +67,11 @@ async fn test() {
     // let _ = proto::get_tolinkshare_data("test").await;
     // let _ = proto::get_vpnnet_data("test").await;
 
-    // let _ = proto::get_mibei_url("test").await;
+    // let _s = proto::get_mibei_url("test").await.unwrap_or_default();
+    let _s = proto::get_v2ssr_url("test").await.unwrap_or_default();
+    if _s.len() > 0 {
+        info!("url is {_s}");
+    }
     // let v2 = PathBuf::from("D:/app/v2rayN-With-Core/bin/v2fly_v5/v2ray.exe").as_path().to_str().unwrap_or_default().to_string();
     // let co = PathBuf::from("d:/vmess_104.21.23.231.json").as_path().to_str().unwrap_or_default().to_string();
 
@@ -1001,7 +1005,9 @@ async fn dispatch(conf: Arc<Value>,
         let recent_put = if SystemTime::now().duration_since(time_add).unwrap_or_default().as_secs() >= 90 { false } else { true };
         let remain = candidate_in.len();
         if remain <= min_candidate && !recent_put{
+            info!("{worker_name} TMPDBG {remain}<={min_candidate} && !{recent_put}");
             if url_in.len() == 0 && data_in.len() == 0 && node_in.len() ==0 && uniq_in.len() == 0 && good_in.len() == 0 {
+                info!("{worker_name} TMPDBG all queue is empty");
                 {
                     let mut b_stop = b_stop_process.write().await;
                     *b_stop = false;
@@ -1012,164 +1018,69 @@ async fn dispatch(conf: Arc<Value>,
                 let s_today = today.format("%Y%m%d").to_string();
                 let yesterday = today.checked_sub_days(chrono::Days::new(1)).unwrap_or_default();
                 let s_yesterday = yesterday.format("%Y%m%d").to_string();
-                let before_yesterday = yesterday.checked_sub_days(chrono::Days::new(1)).unwrap_or_default();
-                let s_before_yesterday = before_yesterday.format("%Y%m%d").to_string();
+                // let before_yesterday = yesterday.checked_sub_days(chrono::Days::new(1)).unwrap_or_default();
+                // let s_before_yesterday = before_yesterday.format("%Y%m%d").to_string();
 
                 let mut urls = vec![
-                    // format!("https://freenode.me/wp-content/uploads/{}/{:02}/{:02}{:02}.txt", today.year(), today.month(), today.month(), today.day()),
-                    // format!("https://freenode.me/wp-content/uploads/{}/{:02}/{:02}{:02}.txt", yesterday.year(), yesterday.month(), yesterday.month(), yesterday.day()),
-                    // format!("https://freenode.me/wp-content/uploads/{}/{:02}/{:02}{:02}.txt", before_yesterday.year(), before_yesterday.month(), before_yesterday.month(), before_yesterday.day()),
-                    // format!("https://clashnode.com/wp-content/uploads/{}/{:02}/{}.txt", today.year(), today.month(), s_today),
-                    // format!("https://clashnode.com/wp-content/uploads/{}/{:02}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-                    // format!("https://nodefree.org/dy/{}/{:02}/{}.txt", today.year(), today.month(), s_today),
-                    format!("https://nodefree.githubrowcontent.com/{}/{:02}/{}.txt", today.year(), today.month(), s_today),
-                    format!("https://nodefree.githubrowcontent.com/{}/{:02}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-                    format!("https://nodefree.githubrowcontent.com/{}/{:02}/{}.txt", before_yesterday.year(), before_yesterday.month(), s_before_yesterday),
                     format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_today),
                     format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_yesterday),
-                    // format!("https://node.oneclash.cc/{}/{:02}/{}.txt", today.year(), today.month(), s_today),
-                    // format!("https://node.oneclash.cc/{}/{:02}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-                    // format!("https://freeclash.org/wp-content/uploads/{}/{:02}/{}.txt", today.year(), today.month(), today.format("%m%d").to_string()),
-                    // format!("https://freeclash.org/wp-content/uploads/{}/{:02}/{}.txt", yesterday.year(), yesterday.month(), yesterday.format("%m%d").to_string()),
-                    format!("https://v2ssr.net/freenode/{}-clash-freenode-v2ssr.net.yaml", s_today),                    
-                    format!("https://v2ssr.net/freenode/{}-clash-freenode-v2ssr.net.yaml", s_yesterday),                    
 
-                    // format!("https://nodebird.net/wp-content/uploads/{}/{}/{}.txt", today.year(), today.month(), s_today),
-                    // format!("https://nodebird.net/wp-content/uploads/{}/{}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/umelabs/node.umelabs.dev/master/Subscribe/v2ray.md"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/freefq/free/master/v2"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/ts-sf/fly/main/v2"),
-                    String::from("https://cdn.jsdelivr.net/gh/ermaozi01/free_clash_vpn/subscribe/v2ray.txt"),
-                    // String::from("https://v2ray.neocities.org/v2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Leon406/SubCrawler/master/sub/share/vless"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Leon406/SubCrawler/master/sub/share/tr"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/a2470982985/getNode/main/v2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/ermaozi01/free_clash_vpn/main/subscribe/v2ray.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ermaozi/get_subscribe/refs/heads/main/subscribe/v2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/ripaojiedian/freenode/main/sub"),
 
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/learnhard-cn/free_proxy_ss/main/free"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Rokate/Proxy-Sub/main/clash/clash_v2ray.yml"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Rokate/Proxy-Sub/main/clash/clash_trojan.yml"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Jsnzkpg/Jsnzkpg/Jsnzkpg/Jsnzkpg"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/ZywChannel/free/main/sub"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/free18/v2ray/main/v.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray"),
 
-                    // format!("https://node.onenode.cc/{}/{:02}/{}.txt", today.year(), today.month(), s_today),
-                    // format!("https://node.onenode.cc/{}/{:02}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-
-                    // String::from("https://jiang.netlify.com/"),
-                    // String::from("https://youlianboshi.netlify.app/"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/eycorsican/rule-sets/master/kitsunebi_sub"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/umelabs/node.umelabs.dev/master/Subscribe/v2ray.md"),
-
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/Long_term_subscription_num"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/get_v2/refs/heads/main/pub/combine.yaml"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/sub/sub_merge.txt"),
-                    // format!("https://ghfast.top/https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/sub/{}/{}.txt", before_yesterday.format("%y%m").to_string(), s_before_yesterday),
-                    // format!("https://ghfast.top/https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/sub/{}/{}.txt", yesterday.format("%y%m").to_string(), s_yesterday),
-                    // format!("https://ghfast.top/https://raw.githubusercontent.com/w1770946466/Auto_proxy/main/sub/{}/{}.txt", today.format("%y%m").to_string(), s_today),
-                    // String::from("https://mareep.netlify.app/sub/merged_proxies_new.yaml"),  // https://github.com/vveg26/chromego_merge
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/a2470982985/getNode/main/v2ray.txt"),   // https://github.com/Flik6/getNode
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/freenodes/freenodes/main/clash.yaml"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/yudou66.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodev2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/ndnode.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/blues.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodefree.yaml"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/feat/ai-crawler-v2/nodes/merged.txt"),
 
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/mheidari98/.proxy/main/all"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/LalatinaHub/Mineral/master/result/nodes"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/zhangkaiitugithub/SubCrawler/main/sub/share/all"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/yebekhe/V2Hub/main/merged_base64"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Mahdi0024/ProxyCollector/master/sub/proxies.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/vmess.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/vless.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/ss.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/trojan.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/All_Configs_Sub.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/server.txt"),
 
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/main/sub/Japan/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/main/sub/United%20States/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/main/sub/Germany/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/main/sub/Singapore/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/main/sub/Austria/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/blob/main/sub/Canada/config.txt"),
-
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/zzz6839/SubCrawler/main/sub/share/all"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/zjfb/SubCrawler/main/sub/share/all"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/QQnight/SubCrawler/main/sub/share/all"),
 
                     String::from("https://url.cr/api/user.ashx?do=freevpn&ip=127.0.0.1&uuid=67ee96e3-70c5-4741-9105-60d7fd8c42b3"),
 
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Mohammadgb0078/IRV2ray/main/vless.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Mohammadgb0078/IRV2ray/main/vmess.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/NiceVPN123/NiceVPN/main/long"),
-                    // format!("https://tglaoshiji.github.io/nodeshare/{}/{}/{}.txt", today.year(), today.month(), s_today),
-                    // format!("https://tglaoshiji.github.io/nodeshare/{}/{}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/AzadNetCH/Clash/main/AzadNet_META_IRAN-Direct.yml"),  里面没有符合地区的
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/AzadNetCH/Clash/main/AzadNet_iOS.txt"),  里面没有符合地区的
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/vxiaov/free_proxies/main/clash/clash.provider.yaml"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/splitted/mixed"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Surfboardv2ray/Proxy-sorter/main/submerge/US.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Surfboardv2ray/v2ray-worker-sub/master/sub"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Surfboardv2ray/Subs/main/Raw"),
-                    // String::from("https://tgscan.onrender.com/sub3"),
-                    // String::from("https://tgscan.onrender.com/sub5"),
-                    // String::from("https://tgscan.onrender.com/sub9/base64"),
-                    // String::from("https://tgscan.onrender.com/sub10/base64"),
-                    // String::from("https://sub.tgzdyz2.xyz/sub"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/iboxz/free-v2ray-collector/main/main/mix"),
                     String::from("https://www.xrayvip.com/free.txt"),
-                    //String::from("https://ghfast.top/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/main/default.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/refs/heads/main/wl.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/trojan"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/vmess"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Huibq/TrojanLinks/master/links/ss"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/hkpc/V2ray-Configs/main/All_Configs_base64_Sub.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/m3hdio1/v2ray_sub/main/v2ray_sub.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/clash-meta/all.yaml"), 
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/all.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
-                    // String::from("https://uploadserver.sialkcable.ir/v2ray/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Memory2314/VMesslinks/main/links/vmess"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/lagzian/SS-Collector/main/mix.txt"),
-                    // String::from("https://ghfast.top/https://github.com/v2clash/V2ray-Configs/raw/main/All_Configs_Sub.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Ptechgithub/configs/main/clash12.yaml"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/cf.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/80.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/443.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/grpc.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/vmess.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/ws.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/vless.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/trojan.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/tls.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/dimzon/scaling-sniffle/main/freedom/tcp.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/vless"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/trojan"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/vmess"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/base64/ss"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/abbasdvd3/clash/main/3.yaml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/V2RAY_SUB.txt"),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no1.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no2.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no3.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no4.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no5.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no6.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no7.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no8.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no9.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no10.txt"),
+
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/linzjian666/chromego_extractor/main/outputs/clash_meta.yaml"),
 
-                    // 如下5个好像最终地址都一样
-                    String::from("https://cdn.jsdelivr.net/gh/a2470982985/getNode@main/v2ray.txt"),    // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
-                    // format!("https://good.john1959.com/v2ray@a/{}-list-1.txt", yesterday.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
-                    // format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", yesterday.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
-                    // format!("https://good.john1959.com/v2ray@a/{}-list-1.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
-                    // format!("https://good.john1959.com/v2ray@b/{}-list-2.txt", today.format("%Y-%-m-%d").to_string()),  // https://github.com/John19187/v2ray-SSR-Clash-Verge-Shadowrocke
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Flikify/Free-Node/refs/heads/main/v2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt"),
                     String::from("https://q3dlaxpoaq.github.io/APIs/cg0.txt"),
                     String::from("https://q3dlaxpoaq.github.io/APIs/cg1.txt"),
@@ -1183,40 +1094,52 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg0.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg1.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg2.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg3.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg4.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub1.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub2.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub3.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub4.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub5.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub6.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub7.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub8.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub9.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub10.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Vauth/node/main/Main"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/vmess.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/vless.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/trojan.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/coldwater-10/V2ray-Config/main/Splitted-By-Protocol/ss.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/Everyday-VPN/Everyday-VPN/main/subscription/main.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/v2tel_links1.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/v2tel_links2.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/last_150.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_Sub.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/skywrt/v2ray-configs/main/All_Configs_base64_Sub.txt"),
-
-                    format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", today.year(), today.month(), s_today),
-                    format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", yesterday.year(), yesterday.month(), s_yesterday),
-                    format!("https://a.nodeshare.xyz/uploads/{}/{}/{}.txt", before_yesterday.year(), before_yesterday.month(), s_before_yesterday),
-
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/barry-far/V2ray-Config/main/All_Configs_Sub.txt"),
-                    // String::from("https://ghfast.top/https://raw.githubusercontent.com/AzadNetCH/Clash/refs/heads/main/AzadNet.txt"),
-                    // String::from("https://goclash.topmarco.tech/data.yaml"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/clashv2ray-hub/v2rayfree/refs/heads/main/v2ray.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/snakem982/proxypool/main/source/v2ray-2.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/zhuhaiuk/free-nodes/main/nodes.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vmess.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vless.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/trojan.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/vincent20240707/free-v2ray-nodes/refs/heads/main/nodes.txt"),
+                    String::from("https://sub.proxygo.org/v2ray.php?key=37a4ce41facf1d22893e6bee57a7ce7a"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Au1rxx/free-vpn-subscriptions/main/output/v2ray-base64.txt"),
+                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
+
+                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rtwo2/FastNodes/main/sub/top.txt"),
+
+                    format!("https://tizinode.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://tizinode.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://tizinode.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://tizinode.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://tizinode.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
+
+                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/V2RayAggregator/refs/heads/master/sub/sub_merge_base64.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/wenxig/dongtai-sub/refs/heads/main/data/sub.txt"),
                 ];
 
                 // mibei url
@@ -1235,6 +1158,26 @@ async fn dispatch(conf: Arc<Value>,
                                 error!("{worker_name} put url failed!!! {e}");
                             }
                             debug!("{worker_name} mibei urls added.");
+                        }
+                    });
+                }
+
+                // v2ssr url
+                if pick_one {
+                    let v2ssr_url = proto::get_v2ssr_url(worker_name).await.unwrap_or_default();
+                    if v2ssr_url.len() > 0 {
+                        urls.push(v2ssr_url);
+                        debug!("{worker_name} v2ssr url added to urls.");
+                    }
+                }else{
+                    let url_out_c = url_out.clone();
+                    tokio::spawn(async move{
+                        let v2ssr_url = proto::get_v2ssr_url(worker_name).await.unwrap_or_default();
+                        if v2ssr_url.len() > 0 {
+                            if let Err(e) = url_out_c.send(v2ssr_url).await{
+                                error!("{worker_name} put url failed!!! {e}");
+                            }
+                            debug!("{worker_name} v2ssr urls added.");
                         }
                     });
                 }
@@ -1272,6 +1215,7 @@ async fn dispatch(conf: Arc<Value>,
                         });
                     }
                 }
+                info!("{worker_name} TMPDBG githubreadme url(s) added.");
 
                 // 打乱顺序
                 if !pick_one {
@@ -1282,6 +1226,7 @@ async fn dispatch(conf: Arc<Value>,
                         url_dup
                     });
                 }
+                info!("{worker_name} TMPDBG shuffle url done.");
 
                 // tolinkshare, vpnnet, sharkdoor data
                 if !pick_one{
@@ -1308,11 +1253,13 @@ async fn dispatch(conf: Arc<Value>,
                             debug!("{worker_name} sharkdoor urls added to urls.");
                         }
                     });
+
+                    info!("{worker_name} TMPDBG tolinkshare/vpnnet/sharkdoor url added.");
                 }else{
                     warn!("in pick_one mode, tolinkshare and vpnnet skip processing !!!");
                 }
 
-                debug!("{worker_name} regular urls len {}", urls.len());
+                info!("{worker_name} TMPDBG regular urls len {}", urls.len());
                 if pick_one && pick_index == usize::MAX {
                     for (_i, _url) in urls.iter().enumerate() {
                         println!("{_i}: {_url}");
@@ -1341,7 +1288,7 @@ async fn dispatch(conf: Arc<Value>,
                 }
 
                 if pick_index != usize::MAX {
-                    info!("the index {pick_index} is used: {}", urls[pick_index]);
+                    info!("{worker_name} the index {pick_index} is used: {}", urls[pick_index]);
                     if let Err(e) = url_out.send(String::from(urls[pick_index].clone())).await{
                         error!("{worker_name} put url failed!!! {e}");
                     }
@@ -1355,11 +1302,12 @@ async fn dispatch(conf: Arc<Value>,
 
                 time_add = SystemTime::now();
             }else{
-                trace!("{worker_name} in processing");
+                info!("{worker_name} in processing");
             }
 
         }else{
             if remain >= max_candidate{
+                info!("{worker_name} TMPDBG {remain}>={max_candidate}");
                 if measure_mode{
                     debug!("{worker_name} in measure_node not stop measure node, now {}", candidate_in.len());
                 } else {
@@ -1371,7 +1319,7 @@ async fn dispatch(conf: Arc<Value>,
                         }
                     }
                     if !url_in.is_empty() || !data_in.is_empty() || !node_in.is_empty() || !uniq_in.is_empty() || !good_in.is_empty() {
-                        info!("{worker_name} candidate remain {remain}, clear other queue");
+                        info!("{worker_name} candidate remain {remain}, clear other queues");
                         while let Ok(_) = url_in.try_recv(){};
                         while let Ok(_) = data_in.try_recv(){};
                         while let Ok(_) = node_in.try_recv(){};
@@ -1384,7 +1332,7 @@ async fn dispatch(conf: Arc<Value>,
                     }
                 }
             }else{
-                trace!("{worker_name} candidate now {}", candidate_in.len());
+                info!("{worker_name} candidate now {}", candidate_in.len());
                 print!("_{}_", candidate_in.len());
                 let _ = io::stdout().flush();
             }
@@ -1392,7 +1340,7 @@ async fn dispatch(conf: Arc<Value>,
 
         tokio::select!{
             _ = e_exit.notified() =>{
-                debug!("{worker_name} got exit flag");
+                info!("{worker_name} got exit flag");
                 exit_flag = true;
             },
             _ = e_candidate_change.notified() =>{
@@ -1400,6 +1348,7 @@ async fn dispatch(conf: Arc<Value>,
             }
             _ = tokio::time::sleep(Duration::from_secs(if recent_put {120} else {60}))=> {
                 // print!("Timed out.");
+                info!("{worker_name} Timed out");
                 // let _ = io::stdout().flush();
             }
             else =>{
