@@ -1,33 +1,34 @@
-use std::error::Error;
-use std::sync::Arc;
-use std::net::SocketAddr;
-use std::net::UdpSocket;
-use std::str::FromStr;
-use std::time::{Duration, SystemTime};
-use std::path::PathBuf;
-use std::io::Read;
-use std::fs::File;
-use serde_json::Value;
-use serde_json::map::Entry;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use log::{debug, trace, warn, error};
+use log::{debug, error, trace, warn};
 use reqwest::Client;
-use tokio::sync::Notify;
-use tokio::time::timeout;
+use serde_json::map::Entry;
+use serde_json::Value;
+use std::error::Error;
+use std::fs::File;
+use std::io::Read;
+use std::net::SocketAddr;
+use std::net::UdpSocket;
+use std::path::Path;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 #[allow(unused_imports)]
 use tokio::process::Command;
+use tokio::sync::Notify;
+use tokio::time::timeout;
 // #[allow(unused_imports)]
 // use toml::Value as tvalue;
-use regex::Regex;
 use crate::node::Node;
+use regex::Regex;
 
 #[allow(unused_macros)]
 macro_rules! assert_types {
     ($($var:ident : $ty:ty),*) => { $(let _: & $ty = & $var;)* }
 }
 
-pub fn get_lan_ip() -> String{
+pub fn get_lan_ip() -> String {
     let sk = UdpSocket::bind("0.0.0.0:0").unwrap();
     let r: SocketAddr = SocketAddr::from_str("8.8.8.8:80").unwrap();
     let _ = sk.connect(r);
@@ -51,7 +52,7 @@ fn repr(s: &str) -> String {
 }
 
 // 添加'='后自动尝试base64解码
-pub async fn b64d(s: &String, url: &str, show: bool) -> Option<String> {
+pub async fn b64d(s: &str, url: &str, show: bool) -> Option<String> {
     let s = s.trim_end_matches('\n').trim_end_matches('\r');
     let mut result = None;
     for i in 0..4 {
@@ -60,48 +61,53 @@ pub async fn b64d(s: &String, url: &str, show: bool) -> Option<String> {
             Ok(bytes) => {
                 result = Some(String::from_utf8(bytes).ok()?);
                 break;
-            },
-            Err(e) => if show {
+            }
+            Err(e) => {
+                if show {
                     if s.len() >= 500 {
-                        trace!("decode failed {e}, padding {i}, s[0..200] = {}, url = {url}", &s[0..100]);
+                        trace!(
+                            "decode failed {e}, padding {i}, s[0..200] = {}, url = {url}",
+                            &s[0..100]
+                        );
                     } else {
                         trace!("decode failed {e}, padding {i}, s = {s}, url = {url}");
                     }
-                },
+                }
+            }
         }
     }
-    if None == result{
-        if show{
-            if s.len() >= 500 {
-                trace!("64decode failed s[0..200] = {} url = {url}", &s[0..100]);
-            } else {
-                trace!("64decode failed s = {s} url = {url}");
-            }
+    if result.is_none() && show {
+        if s.len() >= 500 {
+            trace!("64decode failed s[0..200] = {} url = {url}", &s[0..100]);
+        } else {
+            trace!("64decode failed s = {s} url = {url}");
         }
     }
     result
 }
 
 // 去掉windows统一路径前面的\?\
-pub fn remove_extended_prefix(pathbuf: &PathBuf) -> PathBuf {
+pub fn remove_extended_prefix(pathbuf: &Path) -> PathBuf {
     if let Some(prefix) = pathbuf.to_str().and_then(|p| p.strip_prefix(r"\\?\")) {
         PathBuf::from(prefix)
     } else {
-        pathbuf.clone()
+        pathbuf.to_path_buf()
     }
 }
 
-
 #[allow(dead_code)]
 // 读取文件内容，返回String
-pub fn read_file(file_path: &str) -> Option<String>{
+pub fn read_file(file_path: &str) -> Option<String> {
     let mut path = PathBuf::new();
     path.push(file_path);
-    if !path.is_absolute(){
-        path = path.canonicalize().unwrap_or_else(|e|{debug!("file not found! {e}"); PathBuf::new()});
+    if !path.is_absolute() {
+        path = path.canonicalize().unwrap_or_else(|e| {
+            debug!("file not found! {e}");
+            PathBuf::new()
+        });
         debug!("now path is {path:?}");
     }
-    if path.as_os_str().is_empty(){
+    if path.as_os_str().is_empty() {
         return None;
     }
     let mut s = String::new();
@@ -110,18 +116,21 @@ pub fn read_file(file_path: &str) -> Option<String>{
         return None;
     };
     f.read_to_string(&mut s).unwrap_or_default();
-    debug!("read {} bytes from file {:?}", s.len(), remove_extended_prefix(&path));
+    debug!(
+        "read {} bytes from file {:?}",
+        s.len(),
+        remove_extended_prefix(&path)
+    );
 
     Some(s)
 }
 
 // 调整别名，转为utf8，去掉空格和制表符
-pub fn adjust_alias(s: String) -> String{
+pub fn adjust_alias(s: String) -> String {
     let mut alias = textcode::utf8::decode_to_string(s.as_bytes());
     alias = alias.replace(" ", "").replace("\t", "");
     alias
 }
-
 
 // 合并两个json对象，将json_value2合并到json_value1
 pub fn merge_json_objects(json_value1: &mut Value, json_value2: &Value) {
@@ -139,50 +148,64 @@ pub fn merge_json_objects(json_value1: &mut Value, json_value2: &Value) {
         match map1.entry(key.clone()) {
             Entry::Vacant(entry) => {
                 entry.insert(value2.clone());
-            },
+            }
             Entry::Occupied(mut entry) => {
                 let existing_value = entry.get_mut();
                 match (existing_value.clone(), value2.clone()) {
                     (Value::Object(_), Value::Object(_)) => {
                         merge_json_objects(existing_value, value2);
-                    },
+                    }
                     (_, _) => {
                         entry.insert(value2.clone());
-                    },
+                    }
                 }
-            },
+            }
         };
     }
 }
 
 // 尝试访问代理，返回成功次数和最小延时
-pub async fn check_proxy(worker_name: &str, node: &Node, client: &Client, url: &str, max_retry: u32, min_succ: u32, show_fail: bool, e_exit: Arc<Notify>) -> (u32, u32){
+pub async fn check_proxy(
+    worker_name: &str,
+    node: &Node,
+    client: &Client,
+    url: &str,
+    max_retry: u32,
+    min_succ: u32,
+    show_fail: bool,
+    e_exit: Arc<Notify>,
+) -> (u32, u32) {
     let mut nr_succ = 0;
     let mut min_latency = 999999u128;
-    for _nr in 1..=max_retry{
+    for _nr in 1..=max_retry {
         let req = client.head(url).build().unwrap();
         let start = SystemTime::now();
-        match client.execute(req).await{
-            Ok(_)=>{
-                let latency = SystemTime::now().duration_since(start).unwrap_or_default().as_millis();
-                if latency < min_latency{
+        match client.execute(req).await {
+            Ok(_) => {
+                let latency = SystemTime::now()
+                    .duration_since(start)
+                    .unwrap_or_default()
+                    .as_millis();
+                if latency < min_latency {
                     min_latency = latency;
                 }
                 nr_succ += 1;
-                if nr_succ >= min_succ{   // 已达标
+                if nr_succ >= min_succ {
+                    // 已达标
                     break;
-                }else if nr_succ + (max_retry - _nr) < min_succ{  // 即使后面都成功也达不到min_succ则退出
+                } else if nr_succ + (max_retry - _nr) < min_succ {
+                    // 即使后面都成功也达不到min_succ则退出
                     break;
                 }
-            },
-            Err(e)=>{
+            }
+            Err(e) => {
                 if show_fail {
                     warn!("{worker_name} failed {node} {e}");
                 }
 
                 // 提前退出的情况：被主动拒绝10061，tls握手出错，解码出错；这几种情况再试也不会成功
                 if e.is_connect() && e.is_request() {
-                    if let Some(x) = e.source(){
+                    if let Some(x) = e.source() {
                         if let Some(xx) = x.source() {
                             // warn!("{worker_name} request got sourc.source {}", xx);
                             if let Some(xxx) = xx.source() {
@@ -200,21 +223,21 @@ pub async fn check_proxy(worker_name: &str, node: &Node, client: &Client, url: &
                             }
                         }
                     }
-                } else if e.is_decode(){
+                } else if e.is_decode() {
                     trace!("{worker_name} q failed {node} {e}");
                     break;
                 }
 
-                if nr_succ + (max_retry - _nr) < min_succ{
+                if nr_succ + (max_retry - _nr) < min_succ {
                     trace!("{worker_name} failed {node} {e}");
                     break;
                 }
-                match timeout(Duration::from_secs(2), e_exit.notified()).await {
-                    Ok(_) => {
-                        debug!("{worker_name} got exit flag");
-                        break;
-                    },
-                    Err(_) => {}
+                if timeout(Duration::from_secs(2), e_exit.notified())
+                    .await
+                    .is_ok()
+                {
+                    debug!("{worker_name} got exit flag");
+                    break;
                 }
             }
         };
@@ -226,19 +249,23 @@ pub async fn check_proxy(worker_name: &str, node: &Node, client: &Client, url: &
     (nr_succ, min_latency as u32)
 }
 
-
 #[allow(dead_code)]
 // #[cfg(unix)]
 pub async fn get_distributor_id() -> String {
     let re = Regex::new(r"(?mR)^ID=(\w+)$").unwrap();
     let mut s = String::new();
-    match Command::new("/bin/cat").arg("/etc/os-release").output().await {
+    match Command::new("/bin/cat")
+        .arg("/etc/os-release")
+        .output()
+        .await
+    {
         Ok(output) => {
-            let cmd_out = String::from_utf8(output.stdout).unwrap_or_else(|_| String::from("no stdout content"));
+            let cmd_out = String::from_utf8(output.stdout)
+                .unwrap_or_else(|_| String::from("no stdout content"));
             match re.captures(&cmd_out) {
                 Some(m) => {
                     s = String::from(&m[1]);
-                },
+                }
                 None => {
                     warn!("no ID found !!!");
                 }
@@ -250,7 +277,7 @@ pub async fn get_distributor_id() -> String {
             //     Some(x) => { s = String::from(x.as_str().unwrap()); },
             //     None => { warn!("no ID found !!!"); }
             // }
-        },
+        }
         Err(err) => {
             warn!("cmd exec failed!!! {err}");
         }

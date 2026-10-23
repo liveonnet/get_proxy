@@ -1,13 +1,13 @@
-mod qqwry;
-mod proto;
-mod node;
-mod tools;
-mod launcher;
 mod conf;
+mod launcher;
+mod node;
+mod proto;
+mod qqwry;
+mod tools;
 
-use node::Node;
-use log::{debug, info, warn, error, trace};
 use log::LevelFilter;
+use log::{debug, error, info, trace, warn};
+use node::Node;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, Notify, RwLock};
@@ -21,44 +21,40 @@ use tokio::signal::windows::ctrl_c;
 use tokio::signal;
 
 use async_channel::{bounded, Receiver, Sender};
-use async_priority_channel;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
-use std::error;
 use std::env;
+use std::error;
 // use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io;
-use std::io::{stdin,stdout};
+use std::io::{stdin, stdout};
 // use std::io::Read;
+use bytes::BytesMut;
 use std::io::Write as io_write;
 use std::net::ToSocketAddrs;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::result;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
 use std::time::Duration;
-use bytes::BytesMut;
+use std::time::{SystemTime, UNIX_EPOCH};
 // use std::path::{Path, PathBuf};
-use std::path::Path;
+use chrono::{self, Datelike, Local};
+use clap::{value_parser, Arg, Command};
+use dnsclientx::DNSClient;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use serde_json::Value;  
-use clap::{Command, Arg, value_parser};
+use futures::{channel::mpsc::channel, SinkExt};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use rand::seq::SliceRandom;
+use regex::Regex;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
-use chrono::{self, Datelike, Local};
-use rand::seq::SliceRandom;
-use tokio::net::TcpListener;
-use futures::{
-    channel::mpsc::channel,
-    SinkExt,
-};
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use serde_json::Value;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use dnsclientx::DNSClient;
-use regex::Regex;
+use std::path::Path;
+use tokio::net::TcpListener;
 
 type MyResult<T> = result::Result<T, Box<dyn error::Error>>;
 
@@ -69,7 +65,7 @@ async fn test() {
 
     // let _s = proto::get_mibei_url("test").await.unwrap_or_default();
     let _s = proto::get_v2ssr_url("test").await.unwrap_or_default();
-    if _s.len() > 0 {
+    if !_s.is_empty() {
         info!("url is {_s}");
     }
     // let v2 = PathBuf::from("D:/app/v2rayN-With-Core/bin/v2fly_v5/v2ray.exe").as_path().to_str().unwrap_or_default().to_string();
@@ -100,33 +96,44 @@ async fn test() {
     // debug!("read {} bytes from file", s.len());
     // proto::parse_yaml(&String::from("fake"), &s, &String::from("fake_url"), &Value::Null).await;
 
-    if false{
-    let mut wry = qqwry::QQWry::from(String::from("d:/vsprj/test_rust/get_proxy/qqwry.dat"));
-    for _ip in ["221.165.136.149", "192.168.256.1", "1.2.3.4", "172.64.134.48"]{
-        let loc = wry.read_ip_location(_ip).await;
-        debug!("{} [{}, {}] got {} {}", _ip, qqwry::u32_to_ip(loc.start_ip), qqwry::u32_to_ip(loc.end_ip), loc.country, loc.area);
-    }
+    if false {
+        let mut wry = qqwry::QQWry::from(String::from("d:/vsprj/test_rust/get_proxy/qqwry.dat"));
+        for _ip in [
+            "221.165.136.149",
+            "192.168.256.1",
+            "1.2.3.4",
+            "172.64.134.48",
+        ] {
+            let loc = wry.read_ip_location(_ip).await;
+            debug!(
+                "{} [{}, {}] got {} {}",
+                _ip,
+                qqwry::u32_to_ip(loc.start_ip),
+                qqwry::u32_to_ip(loc.end_ip),
+                loc.country,
+                loc.area
+            );
+        }
     }
 
     // 多线程，互斥信号
-    if false{
-    let counter = Arc::new(Mutex::new(0));
-    let mut handles = vec![];
-    for _ in 0..10 {
-        let counter = Arc::clone(&counter);
-        let handle = thread::spawn(move || {
-            let mut num = counter.lock().unwrap();
-            *num += 1;
-        });
-        handles.push(handle);
-    }
+    if false {
+        let counter = Arc::new(Mutex::new(0));
+        let mut handles = vec![];
+        for _ in 0..10 {
+            let counter = Arc::clone(&counter);
+            let handle = thread::spawn(move || {
+                let mut num = counter.lock().unwrap();
+                *num += 1;
+            });
+            handles.push(handle);
+        }
 
-    for handle in handles {
-        handle.join().unwrap();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        println!("Reuslt: {}", *counter.lock().unwrap());
     }
-    println!("Reuslt: {}", *counter.lock().unwrap());
-    }
-
 }
 
 #[tokio::main]
@@ -135,68 +142,92 @@ async fn main() {
         .version("0.2")
         .author("kevin")
         .about("pick a fast proxy")
-        .arg(Arg::new("in_measure_mode")
-            .short('t')
-            .long("measure_mode")
-            .default_value("false")
-            .default_missing_value("true")
-            .value_parser(value_parser!(bool))
-            .num_args(0..=1)
-            .help("in measure_mode, just picking, not launch"))
-        .arg(Arg::new("pick_one")
-            .short('p')
-            .long("pick_one")
-            .default_value("false")
-            .default_missing_value("true")
-            .value_parser(value_parser!(bool))
-            .num_args(0..=1)
-            .help("pick_one need user select one url to get node at startup"))
-        .arg(Arg::new("config_file")
-            .short('c')
-            .long("conf_file")
-            .required(true)
-            .help("specify a conf file path"))
-        .arg(Arg::new("log_level")
-            .short('d')
-            .long("log_level")
-            .default_value("trace")
-            .default_missing_value("info")
-            .value_parser(clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "error"]))
-            .num_args(0..=1)
-            .help("set debug log output level"))
+        .arg(
+            Arg::new("in_measure_mode")
+                .short('t')
+                .long("measure_mode")
+                .default_value("false")
+                .default_missing_value("true")
+                .value_parser(value_parser!(bool))
+                .num_args(0..=1)
+                .help("in measure_mode, just picking, not launch"),
+        )
+        .arg(
+            Arg::new("pick_one")
+                .short('p')
+                .long("pick_one")
+                .default_value("false")
+                .default_missing_value("true")
+                .value_parser(value_parser!(bool))
+                .num_args(0..=1)
+                .help("pick_one need user select one url to get node at startup"),
+        )
+        .arg(
+            Arg::new("config_file")
+                .short('c')
+                .long("conf_file")
+                .required(true)
+                .help("specify a conf file path"),
+        )
+        .arg(
+            Arg::new("log_level")
+                .short('d')
+                .long("log_level")
+                .default_value("trace")
+                .default_missing_value("info")
+                .value_parser(clap::builder::PossibleValuesParser::new([
+                    "trace", "debug", "info", "error",
+                ]))
+                .num_args(0..=1)
+                .help("set debug log output level"),
+        )
         .get_matches();
 
     let mut lb = env_logger::Builder::new();
     lb.format(|buf, record| {
-            // let tim = buf.timestamp_millis();
-            // let tim = buf.timestamp_seconds();
-            let tim = Local::now().format("%Y-%m-%d_%H:%M:%S");
-            writeln!(
-                buf,
-                "{tim}|{:.1}|{}|{}:{}",
-                record.level(),
-                record.module_path_static().unwrap(),
-                record.line().unwrap(),
-                record.args()
-            )
-        })
-        // .filter(None, LevelFilter::Trace)  // level for my module
-        .filter_module("reqwest", LevelFilter::Info) // level for reqwest
-        .filter_module("rustls", LevelFilter::Info) // level for rustls
-        .filter_module("html5ever", LevelFilter::Info)
-        .filter_module("selectors", LevelFilter::Info)
-        .filter_module("mio_pool", LevelFilter::Info)
-        .filter_module("mio", LevelFilter::Info)
-        .filter_module("mio::pool", LevelFilter::Info)
-        // .format_timestamp_micros()
-        .format_indent(Some(2));
+        // let tim = buf.timestamp_millis();
+        // let tim = buf.timestamp_seconds();
+        let tim = Local::now().format("%Y-%m-%d_%H:%M:%S");
+        writeln!(
+            buf,
+            "{tim}|{:.1}|{}|{}:{}",
+            record.level(),
+            record.module_path_static().unwrap(),
+            record.line().unwrap(),
+            record.args()
+        )
+    })
+    // .filter(None, LevelFilter::Trace)  // level for my module
+    .filter_module("reqwest", LevelFilter::Info) // level for reqwest
+    .filter_module("rustls", LevelFilter::Info) // level for rustls
+    .filter_module("html5ever", LevelFilter::Info)
+    .filter_module("selectors", LevelFilter::Info)
+    .filter_module("mio_pool", LevelFilter::Info)
+    .filter_module("mio", LevelFilter::Info)
+    .filter_module("mio::pool", LevelFilter::Info)
+    // .format_timestamp_micros()
+    .format_indent(Some(2));
 
-    match matches.get_one::<String>("log_level").unwrap().as_str(){
-        "trace"=>{ lb.filter_level(LevelFilter::Trace); trace!("now log level is trace");},
-        "debug"=>{ lb.filter_level(LevelFilter::Debug); debug!("now log level is debug");},
-        "info"=>{ lb.filter_level(LevelFilter::Info); info!("now log level is info");},
-        "error"=>{ lb.filter_level(LevelFilter::Error); error!("now log level is error");},
-        _=>{error!("unsupport log level!!!");}
+    match matches.get_one::<String>("log_level").unwrap().as_str() {
+        "trace" => {
+            lb.filter_level(LevelFilter::Trace);
+            trace!("now log level is trace");
+        }
+        "debug" => {
+            lb.filter_level(LevelFilter::Debug);
+            debug!("now log level is debug");
+        }
+        "info" => {
+            lb.filter_level(LevelFilter::Info);
+            info!("now log level is info");
+        }
+        "error" => {
+            lb.filter_level(LevelFilter::Error);
+            error!("now log level is error");
+        }
+        _ => {
+            error!("unsupport log level!!!");
+        }
     }
     lb.init();
     trace!("this is trace log");
@@ -213,21 +244,22 @@ async fn main() {
     info!("running on {} os.", machine_kind);
 
     let measure_mode = matches.get_one::<bool>("in_measure_mode").unwrap();
-    if *measure_mode{
+    if *measure_mode {
         info!("in measure mode");
-    }else{
+    } else {
         info!("in prod mode");
     }
 
     let pick_one = matches.get_one::<bool>("pick_one").unwrap();
-    if *pick_one{
+    if *pick_one {
         info!("in pick_one mode");
     }
 
     // test().await;
     // return;
 
-    let conf:Value = conf::load_config(matches.get_one::<String>("config_file").unwrap()).unwrap_or_default();
+    let conf: Value =
+        conf::load_config(matches.get_one::<String>("config_file").unwrap()).unwrap_or_default();
     let conf_string = serde_json::to_string_pretty(&conf).unwrap_or_default();
     trace!("conf content:\n{}", conf_string);
     let e_exit: Arc<Notify> = Arc::new(Notify::new());
@@ -238,12 +270,23 @@ async fn main() {
     tokio::spawn(ctrl_c_handler(e_exit.clone()));
 
     // 开启 pac 服务
-    tokio::spawn(pac_server(conf_c.clone(), e_ip_changed.clone(), e_exit.clone()));
-    let _ = do_all(conf_c.clone(), &e_ip_changed, &e_exit, *measure_mode, *pick_one).await;
+    tokio::spawn(pac_server(
+        conf_c.clone(),
+        e_ip_changed.clone(),
+        e_exit.clone(),
+    ));
+    let _ = do_all(
+        conf_c.clone(),
+        &e_ip_changed,
+        &e_exit,
+        *measure_mode,
+        *pick_one,
+    )
+    .await;
     info!("exit.");
 }
 
-async fn ctrl_c_handler(e_exit: Arc<Notify>){
+async fn ctrl_c_handler(e_exit: Arc<Notify>) {
     let mut now: time::Instant;
     loop {
         now = time::Instant::now();
@@ -274,14 +317,20 @@ async fn ctrl_c_handler(e_exit: Arc<Notify>){
 
 // 处理过程：
 // url -从链接取数据-> data -解析数据构造Node节点-> node -对节点中的域名进行解析获取ip地址-> ip -根据节点ip获取地区信息并过滤-> area -对节点进行排重-> uniq -对节点进行tcp链接测试-> good -对节点进行真实连接进行测试-> candidate -做为备用项使用
-async fn do_all(conf: Arc<Value>, e_ip_changed: &Arc<Notify>, e_exit: &Arc<Notify>, measure_mode: bool, pick_one: bool) -> MyResult<String> {
+async fn do_all(
+    conf: Arc<Value>,
+    e_ip_changed: &Arc<Notify>,
+    e_exit: &Arc<Notify>,
+    measure_mode: bool,
+    pick_one: bool,
+) -> MyResult<String> {
     let b_stop_process = Arc::new(RwLock::new(false));
     let (url_out, url_in) = bounded(5);
     let (data_out, data_in) = bounded(5);
-    let (node_out, node_in) = bounded(50);  // todo: 调整容量
+    let (node_out, node_in) = bounded(50); // todo: 调整容量
     let (ip_out, ip_in) = bounded(50);
     let (area_out, area_in) = bounded(50);
-    let (uniq_out, uniq_in) = bounded(50);  // todo: 调整容量
+    let (uniq_out, uniq_in) = bounded(50); // todo: 调整容量
     let (good_out, good_in) = async_priority_channel::bounded::<Node, u32>(50); // todo: 调整容量
     let max_candidate: u64 = conf["candidate_max"].as_u64().unwrap();
     let (candidate_out, candidate_in) = async_priority_channel::bounded::<Node, u32>(max_candidate);
@@ -289,19 +338,23 @@ async fn do_all(conf: Arc<Value>, e_ip_changed: &Arc<Notify>, e_exit: &Arc<Notif
 
     let e_candidate_change = Arc::new(Notify::new());
 
-    let _ = tokio::spawn(dispatch(conf.clone(), url_in.clone(), url_out.clone(),
-                                    data_in.clone(), data_out.clone(),
-                                    node_in.clone(),
-                                    uniq_in.clone(),
-                                    good_in.clone(),
-                                    candidate_in.clone(),
-                                    e_candidate_change.clone(),
-                                    e_clear.clone(), e_exit.clone(),
-                                    b_stop_process.clone(),
-                                    measure_mode,
-                                    pick_one
-                                )
-                        );
+    tokio::spawn(dispatch(
+        conf.clone(),
+        url_in.clone(),
+        url_out.clone(),
+        data_in.clone(),
+        data_out.clone(),
+        node_in.clone(),
+        uniq_in.clone(),
+        good_in.clone(),
+        candidate_in.clone(),
+        e_candidate_change.clone(),
+        e_clear.clone(),
+        e_exit.clone(),
+        b_stop_process.clone(),
+        measure_mode,
+        pick_one,
+    ));
 
     // let nr_workers = num_cpus::get() * 2;
     // let num_threads = std::env::var("NUM_THREADS").unwrap_or("4".to_string()).parse::<usize>().unwrap();
@@ -313,49 +366,107 @@ async fn do_all(conf: Arc<Value>, e_ip_changed: &Arc<Notify>, e_exit: &Arc<Notif
 
     #[cfg(unix)]
     {
-    let distributor_id = tools::get_distributor_id().await;
-    info!("distributor_id={distributor_id}");
+        let distributor_id = tools::get_distributor_id().await;
+        info!("distributor_id={distributor_id}");
     }
 
     let mut st_u2d = JoinSet::new();
-    for i in 1..=nr_workers{
-        st_u2d.spawn(url2data(i, url_in.clone(), data_out.clone(), e_exit.clone(), b_stop_process.clone()));
+    for i in 1..=nr_workers {
+        st_u2d.spawn(url2data(
+            i,
+            url_in.clone(),
+            data_out.clone(),
+            e_exit.clone(),
+            b_stop_process.clone(),
+        ));
     }
 
     let mut st_d2n = JoinSet::new();
     for i in 1..=nr_workers {
-        st_d2n.spawn(data2node(i, data_in.clone(), node_out.clone(), e_exit.clone(), b_stop_process.clone()));
+        st_d2n.spawn(data2node(
+            i,
+            data_in.clone(),
+            node_out.clone(),
+            e_exit.clone(),
+            b_stop_process.clone(),
+        ));
     }
 
     let mut st_n2i = JoinSet::new();
     for i in 1..=nr_workers {
-        st_n2i.spawn(node2ip(i, node_in.clone(), ip_out.clone(), e_exit.clone(), b_stop_process.clone()));
+        st_n2i.spawn(node2ip(
+            i,
+            node_in.clone(),
+            ip_out.clone(),
+            e_exit.clone(),
+            b_stop_process.clone(),
+        ));
     }
 
-    let _ = tokio::spawn(ip2area(1, ip_in.clone(), area_out.clone(), e_exit.clone(), b_stop_process.clone(), conf.clone()));
+    tokio::spawn(ip2area(
+        1,
+        ip_in.clone(),
+        area_out.clone(),
+        e_exit.clone(),
+        b_stop_process.clone(),
+        conf.clone(),
+    ));
 
-    if false{ // debugonly
-    if let Some(s) = tools::read_file("d:/tmp.txt"){
-        if let Err(e) = data_out.send((String::from("xxx"), s)).await {
-            debug!("putting data got err {e}");
+    if false {
+        // debugonly
+        if let Some(s) = tools::read_file("d:/tmp.txt") {
+            if let Err(e) = data_out.send((String::from("xxx"), s)).await {
+                debug!("putting data got err {e}");
+            }
         }
     }
-    }
 
-    let _ = tokio::spawn(uniq(area_in.clone(), uniq_out.clone(), e_clear.clone(), e_exit.clone(), b_stop_process.clone()));
-    tokio::spawn(filter_bad_ip(uniq_in.clone(), good_out.clone(), e_exit.clone(), b_stop_process.clone()));
-    tokio::spawn(measure_node(good_in.clone(), candidate_out.clone(), e_candidate_change.clone(), e_exit.clone(), conf.clone(), b_stop_process.clone()));
+    tokio::spawn(uniq(
+        area_in.clone(),
+        uniq_out.clone(),
+        e_clear.clone(),
+        e_exit.clone(),
+        b_stop_process.clone(),
+    ));
+    tokio::spawn(filter_bad_ip(
+        uniq_in.clone(),
+        good_out.clone(),
+        e_exit.clone(),
+        b_stop_process.clone(),
+    ));
+    tokio::spawn(measure_node(
+        good_in.clone(),
+        candidate_out.clone(),
+        e_candidate_change.clone(),
+        e_exit.clone(),
+        conf.clone(),
+        b_stop_process.clone(),
+    ));
 
-    service(conf.clone(), candidate_in.clone(), e_candidate_change.clone(), e_ip_changed.clone(), e_exit.clone(), measure_mode).await;
+    service(
+        conf.clone(),
+        candidate_in.clone(),
+        e_candidate_change.clone(),
+        e_ip_changed.clone(),
+        e_exit.clone(),
+        measure_mode,
+    )
+    .await;
 
     debug!("do_all done!!!!");
     Ok(String::from("done."))
 }
 
-async fn url2data(idx: usize, url_in: Receiver<String>, data_out: Sender<(String, String)>, e_exit: Arc<Notify>, b_stop: Arc<RwLock<bool>>) -> () {
+async fn url2data(
+    idx: usize,
+    url_in: Receiver<String>,
+    data_out: Sender<(String, String)>,
+    e_exit: Arc<Notify>,
+    b_stop: Arc<RwLock<bool>>,
+) -> () {
     let worker_name = format!("[u2d-{idx}]");
     let mut exit_flag = false;
-    while !exit_flag{
+    while !exit_flag {
         tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
@@ -372,7 +483,12 @@ async fn url2data(idx: usize, url_in: Receiver<String>, data_out: Sender<(String
                 match reqwest::get(&url).await {
                     Ok(it) => {
                         if let Ok(s) = it.text().await {
-                            info!("{worker_name} got {} byte(s) data from {url}", s.len());
+                            if !s.is_empty() {
+                                info!("{worker_name} got {} byte(s) data from {url}", s.len());
+                            } else {
+                                warn!("{worker_name} got {} byte(s) data from {url}", s.len());
+                            }
+
                             if let Err(e) = data_out.send((url, s)).await {
                                 debug!("{worker_name} putting data got err {e}");
                             }
@@ -390,12 +506,18 @@ async fn url2data(idx: usize, url_in: Receiver<String>, data_out: Sender<(String
     info!("{worker_name} done.");
 }
 
-async fn data2node(idx: usize, data_in: Receiver<(String, String)>, node_out: Sender<Node>, e_exit: Arc<Notify>, b_stop: Arc<RwLock<bool>>) -> () {
+async fn data2node(
+    idx: usize,
+    data_in: Receiver<(String, String)>,
+    node_out: Sender<Node>,
+    e_exit: Arc<Notify>,
+    b_stop: Arc<RwLock<bool>>,
+) -> () {
     let worker_name = format!("[d2n-{idx}]");
 
     let mut exit_flag = false;
-    while !exit_flag{
-        tokio::select!{
+    while !exit_flag {
+        tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -429,14 +551,23 @@ async fn data2node(idx: usize, data_in: Receiver<(String, String)>, node_out: Se
     info!("{worker_name} done.");
 }
 
-async fn node2ip(idx: usize, node_in: Receiver<Node>, ip_out: Sender<Node>, e_exit: Arc<Notify>, b_stop: Arc<RwLock<bool>>) -> () {
+async fn node2ip(
+    idx: usize,
+    node_in: Receiver<Node>,
+    ip_out: Sender<Node>,
+    e_exit: Arc<Notify>,
+    b_stop: Arc<RwLock<bool>>,
+) -> () {
     let worker_name = format!("[data2ip-{idx}]");
     let mut exit_flag = false;
-    let l_nameserver = vec![SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53), SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 4, 4)), 53)];
+    let l_nameserver = vec![
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53),
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 4, 4)), 53),
+    ];
     let mut dns = DNSClient::new(l_nameserver);
     dns.set_timeout(Duration::from_secs(5));
-    while !exit_flag{
-        tokio::select!{
+    while !exit_flag {
+        tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -478,13 +609,20 @@ async fn node2ip(idx: usize, node_in: Receiver<Node>, ip_out: Sender<Node>, e_ex
     info!("{worker_name} done.");
 }
 
-async fn ip2area(idx: usize, ip_in: Receiver<Node>, area_out: Sender<Node>, e_exit: Arc<Notify>, b_stop: Arc<RwLock<bool>>, conf: Arc<Value>) -> () {
+async fn ip2area(
+    idx: usize,
+    ip_in: Receiver<Node>,
+    area_out: Sender<Node>,
+    e_exit: Arc<Notify>,
+    b_stop: Arc<RwLock<bool>>,
+    conf: Arc<Value>,
+) -> () {
     let worker_name = format!("[ip2area-{idx}]");
     let mut exit_flag = false;
     let p_area = Regex::new("日本|美国|新加坡|台湾|澳大利亚|韩国|德国|加拿大").unwrap();
     let mut wry = qqwry::QQWry::from(conf["qqwry_path"].as_str().unwrap_or_default().to_string());
-    while !exit_flag{
-        tokio::select!{
+    while !exit_flag {
+        tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -525,12 +663,18 @@ async fn ip2area(idx: usize, ip_in: Receiver<Node>, area_out: Sender<Node>, e_ex
     info!("{worker_name} done.");
 }
 
-async fn uniq(area_in: Receiver<Node>, uniq_out: Sender<Node>, e_clear: Arc<Notify>, e_exit: Arc<Notify>, b_stop: Arc<RwLock<bool>>) -> () {
+async fn uniq(
+    area_in: Receiver<Node>,
+    uniq_out: Sender<Node>,
+    e_clear: Arc<Notify>,
+    e_exit: Arc<Notify>,
+    b_stop: Arc<RwLock<bool>>,
+) -> () {
     let worker_name = "[uniq]";
     let mut st = HashSet::new();
     let mut exit_flag = false;
-    while !exit_flag{
-        tokio::select!{
+    while !exit_flag {
+        tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -566,14 +710,19 @@ async fn uniq(area_in: Receiver<Node>, uniq_out: Sender<Node>, e_clear: Arc<Noti
     info!("{worker_name} done.");
 }
 
-async fn filter_bad_ip(uniq_in: Receiver<Node>, good_out: async_priority_channel::Sender<Node, u32>, e_exit: Arc<Notify>, b_stop: Arc<RwLock<bool>>) -> () {
+async fn filter_bad_ip(
+    uniq_in: Receiver<Node>,
+    good_out: async_priority_channel::Sender<Node, u32>,
+    e_exit: Arc<Notify>,
+    b_stop: Arc<RwLock<bool>>,
+) -> () {
     let worker_name = "[filter]";
-    let mut tasks = FuturesUnordered::new();  // 控制同时存在的协程数量
+    let mut tasks = FuturesUnordered::new(); // 控制同时存在的协程数量
     const MAX_CONCURRENT_TASKS: usize = 200;
 
-    let mut exit_flag= false;
-    while !exit_flag{
-        tokio::select!{
+    let mut exit_flag = false;
+    while !exit_flag {
+        tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -633,29 +782,45 @@ async fn filter_bad_ip(uniq_in: Receiver<Node>, good_out: async_priority_channel
     info!("{worker_name} done.");
 }
 
-async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, candidate_out: async_priority_channel::Sender<Node, u32>, e_candidate_change: Arc<Notify>, e_exit: Arc<Notify>, conf: Arc<Value>, b_stop_process: Arc<RwLock<bool>>) -> () {
+async fn measure_node(
+    good_in: async_priority_channel::Receiver<Node, u32>,
+    candidate_out: async_priority_channel::Sender<Node, u32>,
+    e_candidate_change: Arc<Notify>,
+    e_exit: Arc<Notify>,
+    conf: Arc<Value>,
+    b_stop_process: Arc<RwLock<bool>>,
+) -> () {
     let worker_name = "[measure]";
     let start_port = conf["port_range"][0].as_u64().unwrap_or_default();
     let end_port = conf["port_range"][1].as_u64().unwrap_or_default();
     let max_concurrent = end_port - start_port + 1;
     let (port_tx, mut port_rx) = mpsc::channel(max_concurrent as usize);
-    for _i in start_port..=end_port{
+    for _i in start_port..=end_port {
         let _ = port_tx.send(_i).await;
     }
     // set default headers
     let mut headers = header::HeaderMap::new();
-    if let Value::Object(_m) = &conf["headers"]{
-        for (_k, _v) in _m{
-            let _h_k = HeaderName::from_bytes(_k.as_str().as_bytes()).unwrap_or_else(|e|{error!("{worker_name} convert key {} failed! {e}", _k.as_str()); HeaderName::from_static("")});
-            let _h_v = HeaderValue::from_str(_v.as_str().unwrap_or_default()).unwrap_or_else(|e|{error!("{worker_name} convert value {} failed! {e}", _v.as_str().unwrap()); HeaderValue::from_static("")});
+    if let Value::Object(_m) = &conf["headers"] {
+        for (_k, _v) in _m {
+            let _h_k = HeaderName::from_bytes(_k.as_str().as_bytes()).unwrap_or_else(|e| {
+                error!("{worker_name} convert key {} failed! {e}", _k.as_str());
+                HeaderName::from_static("")
+            });
+            let _h_v = HeaderValue::from_str(_v.as_str().unwrap_or_default()).unwrap_or_else(|e| {
+                error!(
+                    "{worker_name} convert value {} failed! {e}",
+                    _v.as_str().unwrap()
+                );
+                HeaderValue::from_static("")
+            });
             headers.insert(_h_k, _h_v);
         }
-    }else{
+    } else {
         error!("{worker_name} default headers set failed!");
     }
 
     let mut exit_flag = false;
-    while !exit_flag{
+    while !exit_flag {
         tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
@@ -671,14 +836,14 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
                 }
                 let tx = candidate_out.clone();
                 let cur_conf = conf.clone();
-                let cur_port: u64;
-                match port_rx.recv().await{
-                    Some(o) => {cur_port=o},
+
+                let cur_port: u64 = match port_rx.recv().await{
+                    Some(o) => {o},
                     None => {
                         error!("{worker_name} rx recv got None !!! channel closed?");
                         break;
                     }
-                }
+                };
                 let cur_port_tx = port_tx.clone();
                 let cur_good_in = good_in.clone();
                 let cur_e_candidate_change = e_candidate_change.clone();
@@ -697,7 +862,7 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
                     };
 
                     // check again, debug_only
-                    if let None = child.id(){
+                    if child.id().is_none() {
                         warn!("{cur_worker_name} proxy process exited?");
                     }
 
@@ -715,7 +880,7 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
                     let mut b_stop_put = false;
                     {
                         let b_stop = cur_b_stop.read().await;
-                        if *b_stop == true{
+                        if *b_stop {
                             b_stop_put = true;
                             trace!("{cur_worker_name} b_stop, not put to candidate");
                         }
@@ -733,7 +898,7 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
                                     info!("{worker_name} candidate queue is full, stop processing.");
                                     let mut b = cur_b_stop.write().await;
                                     *b = true;
-                                    while let Ok(_) = cur_good_in.try_recv(){};
+                                    while cur_good_in.try_recv().is_ok(){};
                                 }
                             };
                         }else{
@@ -769,29 +934,55 @@ async fn measure_node(good_in: async_priority_channel::Receiver<Node, u32>, cand
     info!("{worker_name} done.");
 }
 
-async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receiver<Node, u32>, e_candidate_change: Arc<Notify>, e_ip_changed: Arc<Notify>, e_exit: Arc<Notify>, measure_mode: bool){
+async fn service(
+    conf: Arc<Value>,
+    candidate_in: async_priority_channel::Receiver<Node, u32>,
+    e_candidate_change: Arc<Notify>,
+    e_ip_changed: Arc<Notify>,
+    e_exit: Arc<Notify>,
+    measure_mode: bool,
+) {
     let worker_name = "[service]";
     let mut pid: u32;
     let mut exit_flag = false;
     let mut cur_ip = tools::get_lan_ip();
     let mut mconf = Value::clone(&conf);
-    let pick_new_interval_seconds = conf["pick_new_interval_seconds"].as_u64().unwrap_or_else(||86400);
+    let pick_new_interval_seconds = conf["pick_new_interval_seconds"].as_u64().unwrap_or(86400);
     // set default headers
     let mut headers = header::HeaderMap::new();
-    if let Value::Object(_m) = conf["headers"].clone(){
-        for (_k, _v) in _m{
-            let _h_k = HeaderName::from_bytes(_k.as_str().as_bytes()).unwrap_or_else(|e|{error!("{worker_name} convert key {} failed! {e}", _k.as_str()); HeaderName::from_static("")});
-            let _h_v = HeaderValue::from_str(_v.as_str().unwrap_or_default()).unwrap_or_else(|e|{error!("{worker_name} convert value {} failed! {e}",  _v.as_str().unwrap()); HeaderValue::from_static("")});
+    if let Value::Object(_m) = conf["headers"].clone() {
+        for (_k, _v) in _m {
+            let _h_k = HeaderName::from_bytes(_k.as_bytes()).unwrap_or_else(|e| {
+                error!("{worker_name} convert key {} failed! {e}", _k.as_str());
+                HeaderName::from_static("")
+            });
+            let _h_v = HeaderValue::from_str(_v.as_str().unwrap_or_default()).unwrap_or_else(|e| {
+                error!(
+                    "{worker_name} convert value {} failed! {e}",
+                    _v.as_str().unwrap()
+                );
+                HeaderValue::from_static("")
+            });
             headers.insert(_h_k, _h_v);
         }
-    }else{
+    } else {
         error!("{worker_name} default headers set failed!");
     }
-    let port: u64 = conf["proxy_port"].as_number().map_or_else(||0, |o|o.as_u64().unwrap_or_default());
+    let port: u64 = conf["proxy_port"]
+        .as_number()
+        .map_or_else(|| 0, |o| o.as_u64().unwrap_or_default());
     // set proxy
-    let mut proxy = reqwest::Proxy::all(format!("http://{}:{port}", conf["proxy_host"].as_str().unwrap())).unwrap().basic_auth(conf["proxy_user"].as_str().unwrap(), conf["proxy_pass"].as_str().unwrap());
+    let mut proxy = reqwest::Proxy::all(format!(
+        "http://{}:{port}",
+        conf["proxy_host"].as_str().unwrap()
+    ))
+    .unwrap()
+    .basic_auth(
+        conf["proxy_user"].as_str().unwrap(),
+        conf["proxy_pass"].as_str().unwrap(),
+    );
     debug!("{worker_name} proxy={proxy:?}");
-    while !exit_flag{
+    while !exit_flag {
         tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
@@ -810,7 +1001,7 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                         },
                         _ = tokio::time::sleep(Duration::from_secs(120)) =>{}
                     }
-                    
+
                 }else{
                     let ip = tools::get_lan_ip();  // 重新获取最新ip
                     if cur_ip != ip {
@@ -889,12 +1080,9 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                                 }
                             }
                             info!("{worker_name} service test failed({nr_succ}/{nr_maxtry} {min_latency}ms) !!! picking new one");
-                            match timeout(Duration::from_millis(10), e_exit.notified()).await {
-                                Ok(_) => {
-                                    warn!("{worker_name} got exit flag!");
-                                    exit_flag = true;
-                                },
-                                Err(_) => {}
+                            if timeout(Duration::from_millis(10), e_exit.notified()).await.is_ok() {
+                                warn!("{worker_name} got exit flag!");
+                                exit_flag = true;
                             }
                             break;
                         }
@@ -922,34 +1110,27 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
                                     };
                                 }
 
-                                match timeout(Duration::from_secs(1), e_exit.notified()).await{
-                                    Ok(_) =>{
-                                        warn!("{worker_name} got exit flag?");
-                                        exit_flag = true;
-                                    },
-                                    Err(_) =>{
-                                    }
+                                if timeout(Duration::from_secs(1), e_exit.notified()).await.is_ok() {
+                                    warn!("{worker_name} got exit flag?");
+                                    exit_flag = true;
                                 }
                                 break;
                             },
                             _ = tokio::time::sleep(Duration::from_secs(120)) => {
-                                match SystemTime::now().duration_since(start_time) {
-                                    Ok(duration) => {
-                                        if duration.as_secs() >= pick_new_interval_seconds {
-                                            // 正常运行一段时间后，主动切换切换为新proxy
-                                            info!("{worker_name} proxy already run {} seconds, switch to new one ...", duration.as_secs());
-                                            if let Err(e) = child.kill().await{
-                                                warn!("{worker_name} proxy {pid} kill failed! {e}");
-                                            }
-                                            if !file_path.is_empty(){
-                                                if let Err(e) = tokio::fs::remove_file(file_path).await{
-                                                    error!("{worker_name} file remove failed! {e}");
-                                                };
-                                            }
-                                            break;
+                                if let Ok(duration) = SystemTime::now().duration_since(start_time) {
+                                    if duration.as_secs() >= pick_new_interval_seconds {
+                                        // 正常运行一段时间后，主动切换切换为新proxy
+                                        info!("{worker_name} proxy already run {} seconds, switch to new one ...", duration.as_secs());
+                                        if let Err(e) = child.kill().await{
+                                            warn!("{worker_name} proxy {pid} kill failed! {e}");
                                         }
-                                    },
-                                    Err(_) => {},
+                                        if !file_path.is_empty(){
+                                            if let Err(e) = tokio::fs::remove_file(file_path).await{
+                                                error!("{worker_name} file remove failed! {e}");
+                                            };
+                                        }
+                                        break;
+                                    }
                                 }
 
                             },
@@ -967,18 +1148,23 @@ async fn service(conf: Arc<Value>, candidate_in: async_priority_channel::Receive
     info!("{worker_name} done.");
 }
 
-async fn dispatch(conf: Arc<Value>,
-    url_in: Receiver<String>, url_out: Sender<String>,
-    data_in: Receiver<(String, String)>, data_out: Sender<(String, String)>,
+async fn dispatch(
+    conf: Arc<Value>,
+    url_in: Receiver<String>,
+    url_out: Sender<String>,
+    data_in: Receiver<(String, String)>,
+    data_out: Sender<(String, String)>,
     node_in: Receiver<Node>,
     uniq_in: Receiver<Node>,
     good_in: async_priority_channel::Receiver<Node, u32>,
     candidate_in: async_priority_channel::Receiver<Node, u32>,
     e_candidate_change: Arc<Notify>,
-    e_clear: Arc<Notify>, e_exit: Arc<Notify>,
+    e_clear: Arc<Notify>,
+    e_exit: Arc<Notify>,
     b_stop_process: Arc<RwLock<bool>>,
     measure_mode: bool,
-    pick_one: bool) {
+    pick_one: bool,
+) {
     let worker_name = "[dispatch]";
 
     info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n pick_new_interval_seconds: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {}\n pick_one: {}",
@@ -986,7 +1172,7 @@ async fn dispatch(conf: Arc<Value>,
         conf["conf_basepath"],
         conf["proxy_host"],
         conf["pac_server_port"],
-        conf["pick_new_interval_seconds"].as_u64().unwrap_or_else(||86400),
+        conf["pick_new_interval_seconds"].as_u64().unwrap_or(86400),
         conf["inboundsSetting"][0]["port"],
         conf["inboundsSetting"][1]["port"],
         conf["inboundsSetting"][2]["port"],
@@ -995,18 +1181,28 @@ async fn dispatch(conf: Arc<Value>,
         measure_mode,
         pick_one);
 
-    // let mut recent_put = false;
     let min_candidate: u64 = conf["candidate_min"].as_u64().unwrap();
     let max_candidate: u64 = conf["candidate_max"].as_u64().unwrap();
-    let mut time_add = SystemTime::now().checked_sub(Duration::from_secs(3600)).unwrap_or_else(||UNIX_EPOCH);
+    let mut time_add = SystemTime::now()
+        .checked_sub(Duration::from_secs(3600))
+        .unwrap_or(UNIX_EPOCH);
     let mut exit_flag = false;
     let mut pick_index: usize = usize::MAX;
-    while !exit_flag{
-        let recent_put = if SystemTime::now().duration_since(time_add).unwrap_or_default().as_secs() >= 90 { false } else { true };
+    while !exit_flag {
+        let recent_put = SystemTime::now()
+            .duration_since(time_add)
+            .unwrap_or_default()
+            .as_secs()
+            < 90;
         let remain = candidate_in.len();
-        if remain <= min_candidate && !recent_put{
+        if remain <= min_candidate && !recent_put {
             info!("{worker_name} TMPDBG {remain}<={min_candidate} && !{recent_put}");
-            if url_in.len() == 0 && data_in.len() == 0 && node_in.len() ==0 && uniq_in.len() == 0 && good_in.len() == 0 {
+            if url_in.is_empty()
+                && data_in.is_empty()
+                && node_in.is_empty()
+                && uniq_in.is_empty()
+                && good_in.is_empty()
+            {
                 info!("{worker_name} TMPDBG all queue is empty");
                 {
                     let mut b_stop = b_stop_process.write().await;
@@ -1016,14 +1212,16 @@ async fn dispatch(conf: Arc<Value>,
                 e_clear.notify_waiters();
                 let today = chrono::Local::now().date_naive();
                 let s_today = today.format("%Y%m%d").to_string();
-                let yesterday = today.checked_sub_days(chrono::Days::new(1)).unwrap_or_default();
-                let s_yesterday = yesterday.format("%Y%m%d").to_string();
+                // let yesterday = today
+                //    .checked_sub_days(chrono::Days::new(1))
+                //    .unwrap_or_default();
+                // let s_yesterday = yesterday.format("%Y%m%d").to_string();
                 // let before_yesterday = yesterday.checked_sub_days(chrono::Days::new(1)).unwrap_or_default();
                 // let s_before_yesterday = before_yesterday.format("%Y%m%d").to_string();
 
                 let mut urls = vec![
                     format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_today),
-                    format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_yesterday),
+//                    format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_yesterday),
 
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Leon406/SubCrawler/master/sub/share/vless"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.txt"),
@@ -1061,40 +1259,29 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://www.xrayvip.com/free.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/refs/heads/main/wl.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no1.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no2.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no3.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no4.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no5.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no6.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no7.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no8.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no9.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no10.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no1.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no2.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no3.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no4.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no5.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no6.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no7.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no8.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no9.txt"),
+//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no10.txt"),
 
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/linzjian666/chromego_extractor/main/outputs/clash_meta.yaml"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Flikify/Free-Node/refs/heads/main/v2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt"),
-                    String::from("https://q3dlaxpoaq.github.io/APIs/cg0.txt"),
-                    String::from("https://q3dlaxpoaq.github.io/APIs/cg1.txt"),
-                    String::from("https://q3dlaxpoaq.github.io/APIs/cg2.txt"),
-                    String::from("https://q3dlaxpoaq.github.io/APIs/cg3.txt"),
-                    String::from("https://q3dlaxpoaq.github.io/APIs/cg4.txt"),
-
 
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/acymz/AutoVPN/main/data/V2.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/HakurouKen/free-node/main/public"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg0.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg1.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg2.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/cg4.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub1.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub2.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
@@ -1102,14 +1289,13 @@ async fn dispatch(conf: Arc<Value>,
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/last_150.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/barry-far/V2ray-Config/main/All_Configs_Sub.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/clashv2ray-hub/v2rayfree/refs/heads/main/v2ray.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/snakem982/proxypool/main/source/v2ray-2.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/zhuhaiuk/free-nodes/main/nodes.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vmess.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vless.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/trojan.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/vincent20240707/free-v2ray-nodes/refs/heads/main/nodes.txt"),
-                    String::from("https://sub.proxygo.org/v2ray.php?key=37a4ce41facf1d22893e6bee57a7ce7a"),
+                    // String::from("https://sub.proxygo.org/v2ray.php?key=37a4ce41facf1d22893e6bee57a7ce7a"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Au1rxx/free-vpn-subscriptions/main/output/v2ray-base64.txt"),
                     format!("https://clash-free-node.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
@@ -1140,21 +1326,50 @@ async fn dispatch(conf: Arc<Value>,
 
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/V2RayAggregator/refs/heads/master/sub/sub_merge_base64.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/wenxig/dongtai-sub/refs/heads/main/data/sub.txt"),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/cbusifabcap/daily_free_vpn/refs/heads/main/sub/V2Ray.yml"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mosapase/v2ray-sub/refs/heads/main/configs.txt"),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/japan.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/united-states.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/canada.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/singapore.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/taiwan.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/australia.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/germany.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/south-korea.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/france.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/united-kingdom.txt"),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/kooker/FreeSubsCheck/main/all.yaml"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Mikasa8051/v2ray-sub/refs/heads/main/nekoray_sub.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rasool083/v2ray-sub/refs/heads/main/sub.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rb360full/Reza_V2ray_Sub/refs/heads/main/output/merged_checked.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rb360full/Reza_V2ray_Sub/refs/heads/main/output/merged_checked2.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/onlymeoneme/v2ray_subs/refs/heads/main/list.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ssnn20012001-bot/v2ray-sub/refs/heads/main/nodes.txt"),
+
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/us.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/france.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/germany.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/japan.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/singapore.txt"),
+                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/south-korea.txt"),
                 ];
 
                 // mibei url
                 if pick_one {
                     let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
-                    if mibei_url.len() > 0 {
+                    if !mibei_url.is_empty() {
                         urls.push(mibei_url);
                         debug!("{worker_name} mibei url added to urls.");
                     }
-                }else{
+                } else {
                     let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
+                    tokio::spawn(async move {
                         let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
-                        if mibei_url.len() > 0 {
-                            if let Err(e) = url_out_c.send(mibei_url).await{
+                        if !mibei_url.is_empty() {
+                            if let Err(e) = url_out_c.send(mibei_url).await {
                                 error!("{worker_name} put url failed!!! {e}");
                             }
                             debug!("{worker_name} mibei urls added.");
@@ -1162,25 +1377,25 @@ async fn dispatch(conf: Arc<Value>,
                     });
                 }
 
-                // v2ssr url
+                /*                 // v2ssr url
                 if pick_one {
                     let v2ssr_url = proto::get_v2ssr_url(worker_name).await.unwrap_or_default();
-                    if v2ssr_url.len() > 0 {
+                    if !v2ssr_url.is_empty() {
                         urls.push(v2ssr_url);
                         debug!("{worker_name} v2ssr url added to urls.");
                     }
-                }else{
+                } else {
                     let url_out_c = url_out.clone();
-                    tokio::spawn(async move{
+                    tokio::spawn(async move {
                         let v2ssr_url = proto::get_v2ssr_url(worker_name).await.unwrap_or_default();
-                        if v2ssr_url.len() > 0 {
-                            if let Err(e) = url_out_c.send(v2ssr_url).await{
+                        if !v2ssr_url.is_empty() {
+                            if let Err(e) = url_out_c.send(v2ssr_url).await {
                                 error!("{worker_name} put url failed!!! {e}");
                             }
                             debug!("{worker_name} v2ssr urls added.");
                         }
                     });
-                }
+                } */
 
                 for [_git_name, _url, _begin_str, _regex_str] in [
                     ["shareclash", "https://ghfast.top/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
@@ -1194,7 +1409,7 @@ async fn dispatch(conf: Arc<Value>,
                     ] {
                     if pick_one {
                         let  one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
-                        if urls.len() > 0 {
+                        if !urls.is_empty() {
                             for url in one_urls {
                                 urls.push(url);
                             }
@@ -1204,9 +1419,9 @@ async fn dispatch(conf: Arc<Value>,
                         let url_out_c = url_out.clone();
                         tokio::spawn(async move{
                             let one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
-                            if one_urls.len() > 0 {
+                            if !one_urls.is_empty() {
                                 for url in one_urls {
-                                    if let Err(e) = url_out_c.send(String::from(url)).await{
+                                    if let Err(e) = url_out_c.send(url).await{
                                         error!("{worker_name} put url failed!!! {e}");
                                     }
                                 }
@@ -1219,7 +1434,7 @@ async fn dispatch(conf: Arc<Value>,
 
                 // 打乱顺序
                 if !pick_one {
-                    urls = tokio::task::block_in_place(||{
+                    urls = tokio::task::block_in_place(|| {
                         let mut url_dup = urls.clone();
                         let mut rng = rand::thread_rng();
                         url_dup.shuffle(&mut rng);
@@ -1229,24 +1444,24 @@ async fn dispatch(conf: Arc<Value>,
                 info!("{worker_name} TMPDBG shuffle url done.");
 
                 // tolinkshare, vpnnet, sharkdoor data
-                if !pick_one{
+                if !pick_one {
                     let data_out_c = data_out.clone();
                     tokio::spawn(async move {
                         let _d1 = proto::get_tolinkshare_data("test").await;
                         let _d2 = proto::get_vpnnet_data("test").await;
-                        for _ret in [_d1, _d2] {
-                            if let Some(_x) = _ret {
-                                if let Err(e) = data_out_c.send(_x).await{
-                                    error!("{worker_name} put data failed!!! {e}");
-                                }
+                        for _x in [_d1, _d2].into_iter().flatten() {
+                            if let Err(e) = data_out_c.send(_x).await {
+                                error!("{worker_name} put data failed!!! {e}");
                             }
                         }
 
                         // 获取几个节点
-                        let l_node = proto::get_sharkdoor_url(worker_name).await.unwrap_or_default();
-                        if l_node.len() > 0 {
+                        let l_node = proto::get_sharkdoor_url(worker_name)
+                            .await
+                            .unwrap_or_default();
+                        if !l_node.is_empty() {
                             for node in l_node {
-                                if let Err(e) = data_out_c.send(node).await{
+                                if let Err(e) = data_out_c.send(node).await {
                                     error!("{worker_name} put data failed!!! {e}");
                                 }
                             }
@@ -1255,7 +1470,7 @@ async fn dispatch(conf: Arc<Value>,
                     });
 
                     info!("{worker_name} TMPDBG tolinkshare/vpnnet/sharkdoor url added.");
-                }else{
+                } else {
                     warn!("in pick_one mode, tolinkshare and vpnnet skip processing !!!");
                 }
 
@@ -1269,17 +1484,17 @@ async fn dispatch(conf: Arc<Value>,
                         s.clear();
                         print!("select by index(0-{}):", urls.len() - 1);
                         let _ = stdout().flush();
-                        match stdin().read_line(&mut s){
+                        match stdin().read_line(&mut s) {
                             Ok(_) => {
-                                if let Ok(n) = s.trim().to_string().parse(){
+                                if let Ok(n) = s.trim().to_string().parse() {
                                     if n < urls.len() {
                                         break n;
                                     }
                                     println!("out of index!");
-                                }else{
+                                } else {
                                     println!("bad input!");
                                 }
-                            },
+                            }
                             Err(e) => {
                                 error!("got error {e}");
                             }
@@ -1288,28 +1503,33 @@ async fn dispatch(conf: Arc<Value>,
                 }
 
                 if pick_index != usize::MAX {
-                    info!("{worker_name} the index {pick_index} is used: {}", urls[pick_index]);
-                    if let Err(e) = url_out.send(String::from(urls[pick_index].clone())).await{
+                    info!(
+                        "{worker_name} the index {pick_index} is used: {}",
+                        urls[pick_index]
+                    );
+                    if let Err(e) = url_out.send(urls[pick_index].clone()).await {
                         error!("{worker_name} put url failed!!! {e}");
                     }
-                }else{
+                } else {
                     for url in urls {
-                        if let Err(e) = url_out.send(String::from(url)).await{
+                        if let Err(e) = url_out.send(url).await {
                             error!("{worker_name} put url failed!!! {e}");
                         }
                     }
                 }
 
                 time_add = SystemTime::now();
-            }else{
+            } else {
                 info!("{worker_name} in processing");
             }
-
-        }else{
-            if remain >= max_candidate{
+        } else {
+            if remain >= max_candidate {
                 info!("{worker_name} TMPDBG {remain}>={max_candidate}");
-                if measure_mode{
-                    debug!("{worker_name} in measure_node not stop measure node, now {}", candidate_in.len());
+                if measure_mode {
+                    debug!(
+                        "{worker_name} in measure_node not stop measure node, now {}",
+                        candidate_in.len()
+                    );
                 } else {
                     {
                         let mut b_stop = b_stop_process.write().await;
@@ -1318,27 +1538,31 @@ async fn dispatch(conf: Arc<Value>,
                             *b_stop = true;
                         }
                     }
-                    if !url_in.is_empty() || !data_in.is_empty() || !node_in.is_empty() || !uniq_in.is_empty() || !good_in.is_empty() {
+                    if !url_in.is_empty()
+                        || !data_in.is_empty()
+                        || !node_in.is_empty()
+                        || !uniq_in.is_empty()
+                        || !good_in.is_empty()
+                    {
                         info!("{worker_name} candidate remain {remain}, clear other queues");
-                        while let Ok(_) = url_in.try_recv(){};
-                        while let Ok(_) = data_in.try_recv(){};
-                        while let Ok(_) = node_in.try_recv(){};
-                        while let Ok(_) = uniq_in.try_recv(){};
-                        while let Ok(_) = good_in.try_recv(){};
-                    }
-                    else{
+                        while url_in.try_recv().is_ok() {}
+                        while data_in.try_recv().is_ok() {}
+                        while node_in.try_recv().is_ok() {}
+                        while uniq_in.try_recv().is_ok() {}
+                        while good_in.try_recv().is_ok() {}
+                    } else {
                         print!(".{}.", candidate_in.len());
                         let _ = io::stdout().flush();
                     }
                 }
-            }else{
+            } else {
                 info!("{worker_name} candidate now {}", candidate_in.len());
                 print!("_{}_", candidate_in.len());
                 let _ = io::stdout().flush();
             }
         }
 
-        tokio::select!{
+        tokio::select! {
             _ = e_exit.notified() =>{
                 info!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -1361,7 +1585,8 @@ async fn dispatch(conf: Arc<Value>,
     info!("{worker_name} done.");
 }
 
-fn async_watcher() -> notify::Result<(RecommendedWatcher, futures::channel::mpsc::Receiver<Event>)> {
+fn async_watcher() -> notify::Result<(RecommendedWatcher, futures::channel::mpsc::Receiver<Event>)>
+{
     let (mut tx, rx) = channel(1);
     let watcher = RecommendedWatcher::new(
         move |res: notify::Result<Event>| {
@@ -1370,15 +1595,20 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, futures::channel::mpsc
                 if let Ok(o) = res {
                     #[cfg(windows)]
                     if o.kind == notify::EventKind::Modify(notify::event::ModifyKind::Any)
-                    || o.kind == notify::EventKind::Create(notify::event::CreateKind::Any) {
+                        || o.kind == notify::EventKind::Create(notify::event::CreateKind::Any)
+                    {
                         tx.send(o).await.unwrap();
                     }
 
                     #[cfg(unix)]
-                    if o.kind == notify::event::EventKind::Modify(notify::event::ModifyKind::Data(notify::event::DataChange::Any)) {
-                    // || o.kind == notify::event::EventKind::Modify(notify::event::ModifyKind::Name(notify::event::RenameMode::To))
-                    // || o.kind == notify::event::EventKind::Modify(notify::event::ModifyKind::Any)
-                    // || o.kind == notify::event::EventKind::Create(notify::event::CreateKind::File){
+                    if o.kind
+                        == notify::event::EventKind::Modify(notify::event::ModifyKind::Data(
+                            notify::event::DataChange::Any,
+                        ))
+                    {
+                        // || o.kind == notify::event::EventKind::Modify(notify::event::ModifyKind::Name(notify::event::RenameMode::To))
+                        // || o.kind == notify::event::EventKind::Modify(notify::event::ModifyKind::Any)
+                        // || o.kind == notify::event::EventKind::Create(notify::event::CreateKind::File){
                         tx.send(o).await.unwrap();
                     }
                 }
@@ -1390,17 +1620,19 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, futures::channel::mpsc
     Ok((watcher, rx))
 }
 
-async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Notify>){
+async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Notify>) {
     let worker_name = "[pac]";
-    let mut proxy_host = conf["proxy_host"].as_str().unwrap_or_default().to_string();  // 只作为初始的ip使用，后续如果ip变更，会动态获取新ip
+    let mut proxy_host = conf["proxy_host"].as_str().unwrap_or_default().to_string(); // 只作为初始的ip使用，后续如果ip变更，会动态获取新ip
     let proxy_port: u64 = conf["proxy_port"].as_u64().unwrap_or_default() + 1;
     let mut s_addr = format!("{}:{}", proxy_host, conf["pac_server_port"]);
     let mut addr = s_addr.to_socket_addrs().unwrap().next().unwrap();
     let file_path = conf["pac_server_file"].as_str().unwrap_or_default();
     let mut file_content = String::new();
-    if let Some(mut s) = tools::read_file(file_path){
+    if let Some(mut s) = tools::read_file(file_path) {
         trace!("{worker_name} file read from {file_path}");
-        s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
+        s = s
+            .replace("{proxy_host}", proxy_host.as_str())
+            .replace("{proxy_port}", proxy_port.to_string().as_str());
         trace!("{worker_name} {file_path}:\n{s}");
         file_content = s;
     } else {
@@ -1409,7 +1641,9 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
 
     let (mut watcher, mut rx) = async_watcher().unwrap();
     let watch_dir = Path::new(file_path).parent().unwrap();
-    watcher.watch(watch_dir, RecursiveMode::NonRecursive).unwrap();
+    watcher
+        .watch(watch_dir, RecursiveMode::NonRecursive)
+        .unwrap();
     let mut last_reload = time::Instant::now();
 
     let mut listener = TcpListener::bind(addr).await.unwrap();
@@ -1418,7 +1652,7 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
     info!("{worker_name} pac server started at {s_addr}");
     while !exit_flag {
         let cur_file_content = file_content.clone();
-        tokio::select!{
+        tokio::select! {
             _ = e_exit.notified() =>{
                 info!("{worker_name} got exit flag");
                 exit_flag = true;
@@ -1441,14 +1675,14 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
             },
             Some(e) = rx.next() => {  // auto reload file on modification
                 debug!("{worker_name} detected {:?} {:?}", e.kind, e.paths);
-                if e.paths.len() > 0 && e.paths[0].as_path() == Path::new(file_path) && last_reload.elapsed() > time::Duration::from_secs(2) {
+                if !e.paths.is_empty() && e.paths[0].as_path() == Path::new(file_path) && last_reload.elapsed() > time::Duration::from_secs(2) {
                     let mut try_time = 1;
                     let max_try = 3;
                     while try_time <= max_try {
                         if let Some(mut s) = tools::read_file(file_path){
                             s = s.replace("{proxy_host}", proxy_host.as_str()).replace("{proxy_port}", proxy_port.to_string().as_str());
                             file_content = s;
-                            if file_content.len() == 0 {
+                            if file_content.is_empty() {
                                 debug!("try {try_time}/{max_try} got 0 byte from {file_path}");
                             } else {
                                 info!("try {try_time}/{max_try} {worker_name} file reloaded. {file_path} {} byte(s)", file_content.len());
@@ -1471,7 +1705,7 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
                     let s = String::from_utf8(buf.to_vec()).unwrap_or_default();
                     trace!("{worker_name} got {read} byte(s) from {new_addr}, content:\n{s}");
                     let mut query_path = String::new();
-                    for _line in s.lines() {
+                    if let Some(_line) = s.lines().next() {  // only check the first line
                         if _line.starts_with("GET ") {
                             let parts: Vec<&str> = _line.split_whitespace().collect();
                             query_path = String::from(parts[1]);
@@ -1481,9 +1715,7 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
                                 stream.flush().await.unwrap();
                                 return;
                             }
-                            break;
                         }
-                        break;  // only check the first line
                     }
 
                     let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", cur_file_content.len(), cur_file_content);
