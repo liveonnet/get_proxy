@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde_json::json;
 use serde_json::Value;
 use std::fmt::{Display, Formatter, Result};
@@ -273,13 +273,17 @@ pub fn create_proxy_conf(
                     "spiderX": unquote_plus(arg.get("spx").map_or_else(||"", |o|o.as_str().unwrap_or_default())).unwrap_or_default()
                     });
                     if !arg.contains_key("public-key") && !arg.contains_key("pbk") {
-                        warn!("{worker_name} key 'public-key' 'pbk' not found in {node}, arg={arg:?} node.source={}", node.source);
+                        warn!("{worker_name} key 'public-key'/'pbk' not found in {node}, raw={}, source={}", node.raw, node.source);
                     }
                     if !arg.contains_key("short-id") && !arg.contains_key("sid") {
-                        warn!("{worker_name} key 'short-id' 'sid' not found in {node}, raw={} node.source={}", node.raw, node.source);
+                        if log::log_enabled!(log::Level::Trace) {
+                            trace!("{worker_name} key 'short-id'/'sid' not found in {node}, raw={}, source={}", node.raw, node.source);
+                        } else {
+                            warn!("{worker_name} key short-id/sid not found in {node}");
+                        }
                     }
                 }
-                "" | "none" | "None" | "null" | "Null" => {
+                "" | "none" | "None" | "null" | "Null" | "false" => {
                     if let Value::Object(ref mut tmp) = outbounds_setting[0]["streamSettings"] {
                         tmp.remove_entry("security");
                     } else {
@@ -287,11 +291,11 @@ pub fn create_proxy_conf(
                     }
                 }
                 _ => {
-                    warn!("{worker_name} unknown security={security} in vless, node={node}, node.param={:?}, node.source={}", node.param, node.source);
+                    warn!("{worker_name} unknown security={security} in vless, node={node}, raw={}, source={}", node.raw, node.source);
                 }
             }
             match network.as_str() {
-                "tcp" => {}
+                "tcp" | "raw" => {}
                 "ws" => {
                     outbounds_setting[0]["streamSettings"]["tlsSettings"] = json!({
                         "serverName": arg.get("sni").map_or_else(||Value::from(node.ip.clone()), |o|o.clone())
@@ -308,7 +312,7 @@ pub fn create_proxy_conf(
                         "path": arg.get("path").clone(),
                     });
                 }
-                "xhttp" => {
+                "xhttp" | "http" => {
                     outbounds_setting[0]["streamSettings"]["xhttpSettings"] = json!({
                         "path": arg.get("path").clone(),
                     });
@@ -336,7 +340,7 @@ pub fn create_proxy_conf(
                     }
                 }
                 unknown => {
-                    warn!("{worker_name} unknown network={unknown} in vless, node={node}, node.param={:?}, node.source={}, node.raw={}", node.param, node.source, node.raw);
+                    warn!("{worker_name} unknown network={unknown:?} in vless, node={node}, raw={}, source={}", node.raw, node.source);
                 }
             }
             setting = conf["conf_tpl"].clone();

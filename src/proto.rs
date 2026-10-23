@@ -132,7 +132,7 @@ pub async fn data2node_one(
                 if port == 0 {
                     port = x["port"].as_u64().map_or(0_u32, |s| s as u32);
                     if port == 0 {
-                        warn!("{worker_name} port is 0, skip!!! {x:?}");
+                        warn!("{worker_name} port is 0, skip!!! raw={_data:?}, x={x:?}, source={url}");
                         continue;
                     }
                 }

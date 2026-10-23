@@ -855,7 +855,9 @@ async fn measure_node(
                     let (mut child, file_path) = match launcher::launcher_proxy(cur_worker_name.as_str(), &_node, &cur_conf, cur_port, true).await{
                         Some((a,b))=>{(a,b)},
                         None=>{
-                            warn!("{cur_worker_name} launcher failed!!! {_node}");
+                            if log::log_enabled!(log::Level::Trace) {
+                                warn!("{cur_worker_name} launcher failed!!! {_node}");
+                            }
                             let _ = cur_port_tx.send(cur_port).await;
                             return
                         }
@@ -893,7 +895,7 @@ async fn measure_node(
                                 debug!("{cur_worker_name} putting data got {e}");
                             }else{
                                 cur_e_candidate_change.notify_one();
-                                debug!("{cur_worker_name} candidate now {}", tx.len());
+                                info!("{cur_worker_name} candidate now {}", tx.len());
                                 if tx.is_full(){
                                     info!("{worker_name} candidate queue is full, stop processing.");
                                     let mut b = cur_b_stop.write().await;
@@ -1262,17 +1264,6 @@ async fn dispatch(
 //                    String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
 
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no1.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no2.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no3.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no4.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no5.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no6.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no7.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no8.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no9.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/main/v2ray_configs_no10.txt"),
-
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
@@ -1356,6 +1347,9 @@ async fn dispatch(
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/singapore.txt"),
                     String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/south-korea.txt"),
                 ];
+
+                // to do: 对github的访问通过随机方式分配代理
+                //gh-proxy.com or ghfast.top or gh.qninq.cn
 
                 // mibei url
                 if pick_one {
@@ -1556,7 +1550,7 @@ async fn dispatch(
                     }
                 }
             } else {
-                info!("{worker_name} candidate now {}", candidate_in.len());
+                debug!("{worker_name} candidate now {}", candidate_in.len());
                 print!("_{}_", candidate_in.len());
                 let _ = io::stdout().flush();
             }
@@ -1568,11 +1562,11 @@ async fn dispatch(
                 exit_flag = true;
             },
             _ = e_candidate_change.notified() =>{
-                debug!("{worker_name} candidate changed to {}", candidate_in.len());
+                info!("{worker_name} candidate changed to {}", candidate_in.len());
             }
             _ = tokio::time::sleep(Duration::from_secs(if recent_put {120} else {60}))=> {
-                // print!("Timed out.");
-                info!("{worker_name} Timed out");
+                debug!("{worker_name} Timed out");
+                print!("~");
                 // let _ = io::stdout().flush();
             }
             else =>{
