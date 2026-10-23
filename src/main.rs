@@ -48,6 +48,7 @@ use futures::StreamExt;
 use futures::{channel::mpsc::channel, SinkExt};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 use regex::Regex;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
@@ -1225,70 +1226,70 @@ async fn dispatch(
                     format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_today),
 //                    format!("https://clashgithub.com/wp-content/uploads/rss/{}.txt", s_yesterday),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Leon406/SubCrawler/master/sub/share/vless"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ermaozi01/free_clash_vpn/main/subscribe/v2ray.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ermaozi/get_subscribe/refs/heads/main/subscribe/v2ray.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ripaojiedian/freenode/main/sub"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Leon406/SubCrawler/master/sub/share/vless"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/ermaozi01/free_clash_vpn/main/subscribe/v2ray.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/ermaozi/get_subscribe/refs/heads/main/subscribe/v2ray.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/ripaojiedian/freenode/main/sub"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Jsnzkpg/Jsnzkpg/Jsnzkpg/Jsnzkpg"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/free18/v2ray/main/v.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Jsnzkpg/Jsnzkpg/Jsnzkpg/Jsnzkpg"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/free18/v2ray/main/v.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/get_v2/refs/heads/main/pub/combine.yaml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/sub/sub_merge.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/yudou66.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodev2ray.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/ndnode.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/blues.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodefree.yaml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/feat/ai-crawler-v2/nodes/merged.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/mahdibland/get_v2/refs/heads/main/pub/combine.yaml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/sub/sub_merge.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/yudou66.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodev2ray.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/ndnode.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/blues.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodefree.yaml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/feat/ai-crawler-v2/nodes/merged.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mheidari98/.proxy/main/all"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/LalatinaHub/Mineral/master/result/nodes"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Mahdi0024/ProxyCollector/master/sub/proxies.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/All_Configs_Sub.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/server.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/mheidari98/.proxy/main/all"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/LalatinaHub/Mineral/master/result/nodes"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Mahdi0024/ProxyCollector/master/sub/proxies.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/All_Configs_Sub.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/server.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/zjfb/SubCrawler/main/sub/share/all"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/zjfb/SubCrawler/main/sub/share/all"),
 
                     String::from("https://url.cr/api/user.ashx?do=freevpn&ip=127.0.0.1&uuid=67ee96e3-70c5-4741-9105-60d7fd8c42b3"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/splitted/mixed"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Surfboardv2ray/Proxy-sorter/main/submerge/US.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/iboxz/free-v2ray-collector/main/main/mix"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Surfboardv2ray/TGParse/main/splitted/mixed"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Surfboardv2ray/Proxy-sorter/main/submerge/US.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/iboxz/free-v2ray-collector/main/main/mix"),
                     String::from("https://www.xrayvip.com/free.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/refs/heads/main/wl.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
-//                    String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/refs/heads/main/wl.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
+//                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/linzjian666/chromego_extractor/main/outputs/clash_meta.yaml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/main/sub/mix"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/linzjian666/chromego_extractor/main/outputs/clash_meta.yaml"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/acymz/AutoVPN/main/data/V2.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/HakurouKen/free-node/main/public"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub1.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub2.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/last_150.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/barry-far/V2ray-Config/main/All_Configs_Sub.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/snakem982/proxypool/main/source/v2ray-2.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/zhuhaiuk/free-nodes/main/nodes.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vmess.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vless.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/trojan.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/vincent20240707/free-v2ray-nodes/refs/heads/main/nodes.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/acymz/AutoVPN/main/data/V2.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/HakurouKen/free-node/main/public"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub1.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub2.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/last_150.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/barry-far/V2ray-Config/main/All_Configs_Sub.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/snakem982/proxypool/main/source/v2ray-2.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/zhuhaiuk/free-nodes/main/nodes.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vmess.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/vless.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MustafaBaqer/VestraNet-Nodes/main/protocols/trojan.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/vincent20240707/free-v2ray-nodes/refs/heads/main/nodes.txt"),
                     // String::from("https://sub.proxygo.org/v2ray.php?key=37a4ce41facf1d22893e6bee57a7ce7a"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Au1rxx/free-vpn-subscriptions/main/output/v2ray-base64.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Au1rxx/free-vpn-subscriptions/main/output/v2ray-base64.txt"),
                     format!("https://clash-free-node.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
                     format!("https://clash-free-node.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
                     format!("https://clash-free-node.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
@@ -1301,7 +1302,7 @@ async fn dispatch(
                     format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
                     format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rtwo2/FastNodes/main/sub/top.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/rtwo2/FastNodes/main/sub/top.txt"),
 
                     format!("https://tizinode.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
                     format!("https://tizinode.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
@@ -1315,41 +1316,54 @@ async fn dispatch(
                     format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
                     format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mahdibland/V2RayAggregator/refs/heads/master/sub/sub_merge_base64.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/wenxig/dongtai-sub/refs/heads/main/data/sub.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/mahdibland/V2RayAggregator/refs/heads/master/sub/sub_merge_base64.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/wenxig/dongtai-sub/refs/heads/main/data/sub.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/cbusifabcap/daily_free_vpn/refs/heads/main/sub/V2Ray.yml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/mosapase/v2ray-sub/refs/heads/main/configs.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/cbusifabcap/daily_free_vpn/refs/heads/main/sub/V2Ray.yml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/mosapase/v2ray-sub/refs/heads/main/configs.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/japan.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/united-states.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/canada.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/singapore.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/taiwan.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/australia.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/germany.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/south-korea.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/france.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/united-kingdom.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/japan.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/united-states.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/canada.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/singapore.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/taiwan.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/australia.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/germany.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/south-korea.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/france.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Nexuspt753/GitHub-Sub-Scanner/refs/heads/main/subs/country/united-kingdom.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/kooker/FreeSubsCheck/main/all.yaml"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/Mikasa8051/v2ray-sub/refs/heads/main/nekoray_sub.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rasool083/v2ray-sub/refs/heads/main/sub.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rb360full/Reza_V2ray_Sub/refs/heads/main/output/merged_checked.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/rb360full/Reza_V2ray_Sub/refs/heads/main/output/merged_checked2.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/onlymeoneme/v2ray_subs/refs/heads/main/list.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/ssnn20012001-bot/v2ray-sub/refs/heads/main/nodes.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/kooker/FreeSubsCheck/main/all.yaml"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Mikasa8051/v2ray-sub/refs/heads/main/nekoray_sub.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/rasool083/v2ray-sub/refs/heads/main/sub.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/rb360full/Reza_V2ray_Sub/refs/heads/main/output/merged_checked.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/rb360full/Reza_V2ray_Sub/refs/heads/main/output/merged_checked2.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/onlymeoneme/v2ray_subs/refs/heads/main/list.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/ssnn20012001-bot/v2ray-sub/refs/heads/main/nodes.txt"),
 
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/us.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/france.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/germany.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/japan.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/singapore.txt"),
-                    String::from("https://ghfast.top/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/south-korea.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/us.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/france.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/germany.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/japan.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/singapore.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/arg9244/V2R-Subs/refs/heads/master/subs/country/south-korea.txt"),
                 ];
 
-                // to do: 对github的访问通过随机方式分配代理
-                //gh-proxy.com or ghfast.top or gh.qninq.cn
+                // 对github的访问通过随机方式分配代理
+                let git_proxies: Vec<&str> = conf["git_proxies"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap_or(""))
+                    .collect();
+                for _line in urls.iter_mut() {
+                    if let Some(_proxy) = git_proxies.choose(&mut thread_rng()) {
+                        *_line = _line.replace("{PROXY}", _proxy);
+                    } else {
+                        warn!("get random proxy failed!");
+                        break;
+                    }
+                }
 
                 // mibei url
                 if pick_one {
@@ -1391,18 +1405,26 @@ async fn dispatch(
                     });
                 } */
 
-                for [_git_name, _url, _begin_str, _regex_str] in [
-                    ["shareclash", "https://ghfast.top/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["v2rayclashnode", "https://ghfast.top/https://raw.githubusercontent.com/v2rayclashnode/v2rayclashnode.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["freev2rayclash", "https://ghfast.top/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["freev2ray", "https://ghfast.top/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["windowsv2ray", "https://ghfast.top/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["clashfreev2ray", "https://ghfast.top/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["v2rayclashx", "https://ghfast.top/https://raw.githubusercontent.com/v2rayclashx/v2rayclashx.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["v2rayclashnodes", "https://ghfast.top/https://raw.githubusercontent.com/v2rayclashnodes/v2rayclashnodes.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                for [_git_name, _url_tpl, _begin_str, _regex_str] in [
+                    ["shareclash", "https://{PROXY}/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["v2rayclashnode", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashnode/v2rayclashnode.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["freev2rayclash", "https://{PROXY}/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["freev2ray", "https://{PROXY}/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["windowsv2ray", "https://{PROXY}/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["clashfreev2ray", "https://{PROXY}/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["v2rayclashx", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashx/v2rayclashx.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    ["v2rayclashnodes", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashnodes/v2rayclashnodes.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
                     ] {
+
+                    let mut _url: String;
+                    if let Some(_proxy) = git_proxies.choose(&mut thread_rng()) {
+                        _url = _url_tpl.replace("{PROXY}", _proxy);
+                    } else {
+                        warn!("get random proxy failed!");
+                        break;
+                    }
                     if pick_one {
-                        let  one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
+                        let  one_urls = proto::get_githubreadme_url(worker_name, &_url, _begin_str, _regex_str).await.unwrap_or_default();
                         if !urls.is_empty() {
                             for url in one_urls {
                                 urls.push(url);
@@ -1412,7 +1434,7 @@ async fn dispatch(
                     } else {
                         let url_out_c = url_out.clone();
                         tokio::spawn(async move{
-                            let one_urls = proto::get_githubreadme_url(worker_name, _url, _begin_str, _regex_str).await.unwrap_or_default();
+                            let one_urls = proto::get_githubreadme_url(worker_name, &_url, _begin_str, _regex_str).await.unwrap_or_default();
                             if !one_urls.is_empty() {
                                 for url in one_urls {
                                     if let Err(e) = url_out_c.send(url).await{
@@ -1430,7 +1452,7 @@ async fn dispatch(
                 if !pick_one {
                     urls = tokio::task::block_in_place(|| {
                         let mut url_dup = urls.clone();
-                        let mut rng = rand::thread_rng();
+                        let mut rng = thread_rng();
                         url_dup.shuffle(&mut rng);
                         url_dup
                     });

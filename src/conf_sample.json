@@ -1,4 +1,9 @@
 {
+    "git_proxies": [
+        "gh-proxy.com",
+        "ghfast.top",
+        "gh.qninq.cn"
+    ],
     "port_range": [
         3000,
         3040
