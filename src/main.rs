@@ -52,7 +52,9 @@ use rand::thread_rng;
 use regex::Regex;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::Client;
 use serde_json::Value;
+use socket2::{Domain, Socket, Type};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use tokio::net::TcpListener;
@@ -65,10 +67,10 @@ async fn test() {
     // let _ = proto::get_vpnnet_data("test").await;
 
     // let _s = proto::get_mibei_url("test").await.unwrap_or_default();
-    let _s = proto::get_v2ssr_url("test").await.unwrap_or_default();
-    if !_s.is_empty() {
-        info!("url is {_s}");
-    }
+    // let _s = proto::get_v2ssr_url("test").await.unwrap_or_default();
+    // if !_s.is_empty() {
+    // info!("url is {_s}");
+    // }
     // let v2 = PathBuf::from("D:/app/v2rayN-With-Core/bin/v2fly_v5/v2ray.exe").as_path().to_str().unwrap_or_default().to_string();
     // let co = PathBuf::from("d:/vmess_104.21.23.231.json").as_path().to_str().unwrap_or_default().to_string();
 
@@ -317,7 +319,7 @@ async fn ctrl_c_handler(e_exit: Arc<Notify>) {
 }
 
 // 处理过程：
-// url -从链接取数据-> data -解析数据构造Node节点-> node -对节点中的域名进行解析获取ip地址-> ip -根据节点ip获取地区信息并过滤-> area -对节点进行排重-> uniq -对节点进行tcp链接测试-> good -对节点进行真实连接进行测试-> candidate -做为备用项使用
+// url -从链接取数据-> data -解析数据构造Node节点-> node -对节点中的域名进行解析获取ip地址-> ip -根据节点ip获取地区信息并过滤-> area -对节点进行排重-> uniq -对节点进行tcp链接测试-> good -对节点进行真实连接测试-> candidate -做为备用项使用
 async fn do_all(
     conf: Arc<Value>,
     e_ip_changed: &Arc<Notify>,
@@ -326,10 +328,10 @@ async fn do_all(
     pick_one: bool,
 ) -> MyResult<String> {
     let b_stop_process = Arc::new(RwLock::new(false));
-    let (url_out, url_in) = bounded(5);
-    let (data_out, data_in) = bounded(5);
-    let (node_out, node_in) = bounded(50); // todo: 调整容量
-    let (ip_out, ip_in) = bounded(50);
+    let (url_out, url_in) = bounded(10);
+    let (data_out, data_in) = bounded(10);
+    let (node_out, node_in) = bounded(200); // todo: 调整容量
+    let (ip_out, ip_in) = bounded(100);
     let (area_out, area_in) = bounded(50);
     let (uniq_out, uniq_in) = bounded(50); // todo: 调整容量
     let (good_out, good_in) = async_priority_channel::bounded::<Node, u32>(50); // todo: 调整容量
@@ -467,6 +469,11 @@ async fn url2data(
 ) -> () {
     let worker_name = format!("[u2d-{idx}]");
     let mut exit_flag = false;
+    let client = Client::builder()
+        .timeout(Duration::from_secs(20)) // 总超时：10秒
+        .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
+        .build()
+        .unwrap();
     while !exit_flag {
         tokio::select! {
             _ = e_exit.notified() =>{
@@ -481,7 +488,7 @@ async fn url2data(
                         continue;
                     }
                 }
-                match reqwest::get(&url).await {
+                match client.get(&url).send().await {
                     Ok(it) => {
                         if let Ok(s) = it.text().await {
                             if !s.is_empty() {
@@ -497,7 +504,7 @@ async fn url2data(
                         }
                     },
                     Err(err) => {
-                        info!("{worker_name} fetching {url} got err {err}");
+                        info!("{worker_name} fetching {url} got err: {err}");
                     }
                 }
             }
@@ -895,7 +902,7 @@ async fn measure_node(
                             if let Err(e) = tx.send(_node, 999999u32 - min_latency).await {
                                 debug!("{cur_worker_name} putting data got {e}");
                             }else{
-                                cur_e_candidate_change.notify_one();
+                                cur_e_candidate_change.notify_waiters();
                                 info!("{cur_worker_name} candidate now {}", tx.len());
                                 if tx.is_full(){
                                     info!("{worker_name} candidate queue is full, stop processing.");
@@ -994,7 +1001,7 @@ async fn service(
             Ok((_node, mut _prio)) = candidate_in.recv() =>{
                 _prio = 999999u32 - _prio;
                 debug!("{} pick {}ms {} {}", worker_name, _prio, _node.area, _node);
-                e_candidate_change.notify_one();
+                e_candidate_change.notify_waiters();
                 if measure_mode{
                     info!("{worker_name} in measure_mode, not launch service, sleep 120 sec ...");
                     tokio::select!{
@@ -1192,6 +1199,9 @@ async fn dispatch(
     let mut exit_flag = false;
     let mut pick_index: usize = usize::MAX;
     while !exit_flag {
+        print!(".");
+        let _ = io::stdout().flush();
+
         let recent_put = SystemTime::now()
             .duration_since(time_add)
             .unwrap_or_default()
@@ -1199,7 +1209,7 @@ async fn dispatch(
             < 90;
         let remain = candidate_in.len();
         if remain <= min_candidate && !recent_put {
-            info!("{worker_name} TMPDBG {remain}<={min_candidate} && !{recent_put}");
+            info!("{worker_name} TMPDBG {remain}<={min_candidate} && not recent put");
             if url_in.is_empty()
                 && data_in.is_empty()
                 && node_in.is_empty()
@@ -1263,7 +1273,7 @@ async fn dispatch(
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/refs/heads/main/wl.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
 //                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
+//                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
 
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/Kwinshadow/TelegramV2rayCollector/main/sublinks/mix.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/main/sub/Mix/mix.txt"),
@@ -1278,7 +1288,6 @@ async fn dispatch(
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/nyeinkokoaung404/V2ray-Configs/main/Sub2.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/SonzaiEkkusu/V2RayDumper/refs/heads/main/config.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/SamanGho/v2ray_collector/refs/heads/main/last_150.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/barry-far/V2ray-Config/main/All_Configs_Sub.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/snakem982/proxypool/main/source/v2ray-2.txt"),
@@ -1290,31 +1299,14 @@ async fn dispatch(
                     // String::from("https://sub.proxygo.org/v2ray.php?key=37a4ce41facf1d22893e6bee57a7ce7a"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/Au1rxx/free-vpn-subscriptions/main/output/v2ray-base64.txt"),
-                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://clash-free-node.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
 
-                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://jiedianmianfei.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://node.freeclashnode.com/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://node.freeclashnode.com/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://node.freeclashnode.com/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://node.freeclashnode.com/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
+                    format!("https://node.freeclashnode.com/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
 
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/rtwo2/FastNodes/main/sub/top.txt"),
-
-                    format!("https://tizinode.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://tizinode.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://tizinode.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://tizinode.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://tizinode.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
-
-                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/0-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/1-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/2-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/3-{}.txt", today.year(), today.month(), s_today),
-                    format!("https://nodev2rayclash.github.io/uploads/{}/{:02}/4-{}.txt", today.year(), today.month(), s_today),
 
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/mahdibland/V2RayAggregator/refs/heads/master/sub/sub_merge_base64.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/wenxig/dongtai-sub/refs/heads/main/data/sub.txt"),
@@ -1365,45 +1357,8 @@ async fn dispatch(
                     }
                 }
 
-                // mibei url
-                if pick_one {
-                    let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
-                    if !mibei_url.is_empty() {
-                        urls.push(mibei_url);
-                        debug!("{worker_name} mibei url added to urls.");
-                    }
-                } else {
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move {
-                        let mibei_url = proto::get_mibei_url(worker_name).await.unwrap_or_default();
-                        if !mibei_url.is_empty() {
-                            if let Err(e) = url_out_c.send(mibei_url).await {
-                                error!("{worker_name} put url failed!!! {e}");
-                            }
-                            debug!("{worker_name} mibei urls added.");
-                        }
-                    });
-                }
-
-                /*                 // v2ssr url
-                if pick_one {
-                    let v2ssr_url = proto::get_v2ssr_url(worker_name).await.unwrap_or_default();
-                    if !v2ssr_url.is_empty() {
-                        urls.push(v2ssr_url);
-                        debug!("{worker_name} v2ssr url added to urls.");
-                    }
-                } else {
-                    let url_out_c = url_out.clone();
-                    tokio::spawn(async move {
-                        let v2ssr_url = proto::get_v2ssr_url(worker_name).await.unwrap_or_default();
-                        if !v2ssr_url.is_empty() {
-                            if let Err(e) = url_out_c.send(v2ssr_url).await {
-                                error!("{worker_name} put url failed!!! {e}");
-                            }
-                            debug!("{worker_name} v2ssr urls added.");
-                        }
-                    });
-                } */
+                let mut st: JoinSet<Option<(String, Vec<String>)>> = JoinSet::new();
+                st.spawn(proto::get_mibei_url(worker_name));
 
                 for [_git_name, _url_tpl, _begin_str, _regex_str] in [
                     ["shareclash", "https://{PROXY}/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
@@ -1423,30 +1378,34 @@ async fn dispatch(
                         warn!("get random proxy failed!");
                         break;
                     }
+
                     if pick_one {
-                        let  one_urls = proto::get_githubreadme_url(worker_name, &_url, _begin_str, _regex_str).await.unwrap_or_default();
-                        if !urls.is_empty() {
+                        let  (_, one_urls) = proto::get_githubreadme_url(worker_name, _git_name, _url.clone(), _begin_str, _regex_str).await.unwrap_or_default();
+                        if !one_urls.is_empty() {
                             for url in one_urls {
                                 urls.push(url);
                             }
                             debug!("{worker_name} {_git_name} urls added to urls.");
                         }
                     } else {
-                        let url_out_c = url_out.clone();
-                        tokio::spawn(async move{
-                            let one_urls = proto::get_githubreadme_url(worker_name, &_url, _begin_str, _regex_str).await.unwrap_or_default();
-                            if !one_urls.is_empty() {
-                                for url in one_urls {
-                                    if let Err(e) = url_out_c.send(url).await{
-                                        error!("{worker_name} put url failed!!! {e}");
-                                    }
-                                }
-                                debug!("{worker_name} {_git_name} urls added.");
-                            }
-                        });
+                        st.spawn(proto::get_githubreadme_url(worker_name, _git_name, _url.clone(), _begin_str, _regex_str));
                     }
                 }
-                info!("{worker_name} TMPDBG githubreadme url(s) added.");
+
+                while let Some(rslt) = st.join_next().await {
+                    if let Ok(Some((_gitname, _urls))) = rslt {
+                        debug!(
+                            "{worker_name} {_gitname} {} urls added to urls.",
+                            _urls.len()
+                        );
+                        if !_urls.is_empty() {
+                            for _url in _urls {
+                                urls.push(_url);
+                            }
+                        }
+                    }
+                }
+                info!("{worker_name} TMPDBG all githubreadme url(s) added.");
 
                 // 打乱顺序
                 if !pick_one {
@@ -1459,7 +1418,7 @@ async fn dispatch(
                 }
                 info!("{worker_name} TMPDBG shuffle url done.");
 
-                // tolinkshare, vpnnet, sharkdoor data
+                // tolinkshare/sharkdoor data
                 if !pick_one {
                     let data_out_c = data_out.clone();
                     tokio::spawn(async move {
@@ -1481,13 +1440,13 @@ async fn dispatch(
                                     error!("{worker_name} put data failed!!! {e}");
                                 }
                             }
-                            debug!("{worker_name} sharkdoor urls added to urls.");
+                            debug!("{worker_name} sharkdoor data added to data_out.");
                         }
                     });
 
-                    info!("{worker_name} TMPDBG tolinkshare/vpnnet/sharkdoor url added.");
+                    info!("{worker_name} TMPDBG tolinkshare/sharkdoor data added.");
                 } else {
-                    warn!("in pick_one mode, tolinkshare and vpnnet skip processing !!!");
+                    warn!("in pick_one mode, tolinkshare and sharkdoor skip processing !!!");
                 }
 
                 info!("{worker_name} TMPDBG regular urls len {}", urls.len());
@@ -1527,16 +1486,28 @@ async fn dispatch(
                         error!("{worker_name} put url failed!!! {e}");
                     }
                 } else {
-                    for url in urls {
-                        if let Err(e) = url_out.send(url).await {
-                            error!("{worker_name} put url failed!!! {e}");
+                    info!("{worker_name} sending {} urls to url_out", urls.len());
+                    for (idx, url) in urls.into_iter().enumerate() {
+                        if let Err(e) = url_out.try_send(url) {
+                            error!("{worker_name} put url break at idx {idx} cause: {e}");
+                            break;
                         }
                     }
+                    info!("{worker_name} urls sent done");
                 }
 
                 time_add = SystemTime::now();
             } else {
-                info!("{worker_name} in processing");
+                let b_stop = b_stop_process.read().await;
+                info!(
+                    "{worker_name} in processing, url:{} data:{} node:{} uniq:{} good:{} b_stop:{}",
+                    url_in.len(),
+                    data_in.len(),
+                    node_in.len(),
+                    uniq_in.len(),
+                    good_in.len(),
+                    *b_stop
+                );
             }
         } else {
             if remain >= max_candidate {
@@ -1566,13 +1537,14 @@ async fn dispatch(
                         while node_in.try_recv().is_ok() {}
                         while uniq_in.try_recv().is_ok() {}
                         while good_in.try_recv().is_ok() {}
+                        info!("{worker_name} queues cleared.");
                     } else {
-                        print!(".{}.", candidate_in.len());
+                        print!("={}=", candidate_in.len());
                         let _ = io::stdout().flush();
                     }
                 }
             } else {
-                debug!("{worker_name} candidate now {}", candidate_in.len());
+                // info!("{worker_name} candidate now {}", candidate_in.len());
                 print!("_{}_", candidate_in.len());
                 let _ = io::stdout().flush();
             }
@@ -1587,9 +1559,9 @@ async fn dispatch(
                 info!("{worker_name} candidate changed to {}", candidate_in.len());
             }
             _ = tokio::time::sleep(Duration::from_secs(if recent_put {120} else {60}))=> {
-                debug!("{worker_name} Timed out");
+                // debug!("{worker_name} Timed out");
                 print!("~");
-                // let _ = io::stdout().flush();
+                let _ = io::stdout().flush();
             }
             else =>{
                 warn!("{worker_name} should not be here !!!");
@@ -1642,6 +1614,10 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
     let proxy_port: u64 = conf["proxy_port"].as_u64().unwrap_or_default() + 1;
     let mut s_addr = format!("{}:{}", proxy_host, conf["pac_server_port"]);
     let mut addr = s_addr.to_socket_addrs().unwrap().next().unwrap();
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, None).unwrap(); // 创建底层 socket
+    socket.set_reuse_address(true).unwrap(); // 设置 SO_REUSEADDR (允许重用地址/端口)
+    socket.bind(&addr.into()).unwrap(); // 绑定地址
+    socket.listen(64).unwrap(); // 设置为监听模式, 设置全连接队列最大容量(可能用不到)
     let file_path = conf["pac_server_file"].as_str().unwrap_or_default();
     let mut file_content = String::new();
     if let Some(mut s) = tools::read_file(file_path) {
@@ -1662,7 +1638,7 @@ async fn pac_server(conf: Arc<Value>, e_ip_changed: Arc<Notify>, e_exit: Arc<Not
         .unwrap();
     let mut last_reload = time::Instant::now();
 
-    let mut listener = TcpListener::bind(addr).await.unwrap();
+    let mut listener = TcpListener::from_std(socket.into()).unwrap();
 
     let mut exit_flag = false;
     info!("{worker_name} pac server started at {s_addr}");
