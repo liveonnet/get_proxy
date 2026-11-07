@@ -330,7 +330,7 @@ async fn do_all(
     let b_stop_process = Arc::new(RwLock::new(false));
     let (url_out, url_in) = bounded(10);
     let (data_out, data_in) = bounded(10);
-    let (node_out, node_in) = bounded(200); // todo: 调整容量
+    let (node_out, node_in) = bounded(300); // todo: 调整容量
     let (ip_out, ip_in) = bounded(100);
     let (area_out, area_in) = bounded(50);
     let (uniq_out, uniq_in) = bounded(50); // todo: 调整容量
@@ -1357,7 +1357,7 @@ async fn dispatch(
                     }
                 }
 
-                let mut st: JoinSet<Option<(String, Vec<String>)>> = JoinSet::new();
+                let mut st: JoinSet<Option<(&str, Vec<String>)>> = JoinSet::new();
                 st.spawn(proto::get_mibei_url(worker_name));
 
                 for [_git_name, _url_tpl, _begin_str, _regex_str] in [

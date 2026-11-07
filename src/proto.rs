@@ -588,7 +588,7 @@ pub async fn parse_yaml(
     }
 }
 
-pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
+pub async fn get_mibei_url<'a>(worker_name: &str) -> Option<(&'a str, Vec<String>)> {
     trace!("{worker_name} try to get mibei url...");
     let url = "https://www.mibei77.com/";
     let mut ret = None;
@@ -631,7 +631,7 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
                         .unwrap();
                     match re.find(&s) {
                         Some(x) => {
-                            ret = Some((String::from(url), vec![String::from(x.as_str())]));
+                            ret = Some((url, vec![String::from(x.as_str())]));
                             trace!("{worker_name} got mibei url {ret:?}");
                         }
                         None => {
@@ -717,13 +717,13 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)> {
     Some(ret)
 }
 
-pub async fn get_githubreadme_url(
+pub async fn get_githubreadme_url<'a>(
     worker_name: &str,
-    git_name: &str,
+    git_name: &'a str,
     url: &str,
     begin_str: &str,
     regex_str: &str,
-) -> Option<(String, Vec<String>)> {
+) -> Option<(&'a str, Vec<String>)> {
     let mut ret = vec![];
     let mut content = String::new();
     match reqwest::get(url).await {
@@ -749,7 +749,7 @@ pub async fn get_githubreadme_url(
         trace!("{worker_name} got {} url(s) content from {url}", ret.len());
     }
 
-    Some((String::from(git_name), ret))
+    Some((git_name, ret))
 }
 
 // 直接返回"trjan:://xxxx"形式的节点列表
