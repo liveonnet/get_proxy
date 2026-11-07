@@ -720,24 +720,23 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)> {
 pub async fn get_githubreadme_url(
     worker_name: &str,
     git_name: &str,
-    url: String,
+    url: &str,
     begin_str: &str,
     regex_str: &str,
 ) -> Option<(String, Vec<String>)> {
     let mut ret = vec![];
     let mut content = String::new();
-    let _github_url = url.clone();
     match reqwest::get(url).await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
-                trace!("{worker_name} get {} bytes from {_github_url}", s.len());
+                trace!("{worker_name} get {} bytes from {url}", s.len());
                 content = s;
             } else {
-                warn!("{worker_name} can't get content from {_github_url} !!!");
+                warn!("{worker_name} can't get content from {url} !!!");
             }
         }
         Err(e) => {
-            trace!("{worker_name} fetching {_github_url} got err {e}");
+            trace!("{worker_name} fetching {url} got err {e}");
         }
     }
 
@@ -747,10 +746,7 @@ pub async fn get_githubreadme_url(
             trace!("{worker_name} got url {}", _url);
             ret.push(String::from(_url));
         }
-        trace!(
-            "{worker_name} got {} url(s) content from {_github_url}",
-            ret.len()
-        );
+        trace!("{worker_name} got {} url(s) content from {url}", ret.len());
     }
 
     Some((String::from(git_name), ret))

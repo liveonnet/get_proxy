@@ -1380,7 +1380,7 @@ async fn dispatch(
                     }
 
                     if pick_one {
-                        let  (_, one_urls) = proto::get_githubreadme_url(worker_name, _git_name, _url.clone(), _begin_str, _regex_str).await.unwrap_or_default();
+                        let  (_, one_urls) = proto::get_githubreadme_url(worker_name, _git_name, &_url, _begin_str, _regex_str).await.unwrap_or_default();
                         if !one_urls.is_empty() {
                             for url in one_urls {
                                 urls.push(url);
@@ -1388,7 +1388,10 @@ async fn dispatch(
                             debug!("{worker_name} {_git_name} urls added to urls.");
                         }
                     } else {
-                        st.spawn(proto::get_githubreadme_url(worker_name, _git_name, _url.clone(), _begin_str, _regex_str));
+                        st.spawn(async move{
+                            proto::get_githubreadme_url(worker_name, _git_name, &_url, _begin_str, _regex_str).await
+                        });
+
                     }
                 }
 
