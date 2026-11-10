@@ -273,11 +273,11 @@ pub fn create_proxy_conf(
                     "spiderX": unquote_plus(arg.get("spx").map_or_else(||"", |o|o.as_str().unwrap_or_default())).unwrap_or_default()
                     });
                     if !arg.contains_key("public-key") && !arg.contains_key("pbk") {
-                        warn!("{worker_name} key 'public-key'/'pbk' not found in {node}, raw={}, source={}", node.raw, node.source);
+                        warn!("{worker_name} key public-key/pbk not found in {node}, raw={}, source={}", node.raw, node.source);
                     }
                     if !arg.contains_key("short-id") && !arg.contains_key("sid") {
                         if log::log_enabled!(log::Level::Trace) {
-                            trace!("{worker_name} key 'short-id'/'sid' not found in {node}, raw={}, source={}", node.raw, node.source);
+                            trace!("{worker_name} key short-id/sid not found in {node}, raw={}, source={}", node.raw, node.source);
                         } else {
                             warn!("{worker_name} key short-id/sid not found in {node}");
                         }

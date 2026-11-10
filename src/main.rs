@@ -66,7 +66,10 @@ async fn test() {
     // let _ = proto::get_tolinkshare_data("test").await;
     // let _ = proto::get_vpnnet_data("test").await;
 
-    // let _s = proto::get_mibei_url("test").await.unwrap_or_default();
+    let _s = proto::get_v2rayclashx_url("test").await;
+    if let Some((_source, _urls)) = _s {
+        debug!("{_source} {} urls got: {_urls:?}", _urls.len());
+    }
     // let _s = proto::get_v2ssr_url("test").await.unwrap_or_default();
     // if !_s.is_empty() {
     // info!("url is {_s}");
@@ -208,6 +211,7 @@ async fn main() {
     .filter_module("mio_pool", LevelFilter::Info)
     .filter_module("mio", LevelFilter::Info)
     .filter_module("mio::pool", LevelFilter::Info)
+    .filter_module("tungstenite::handshake::client", LevelFilter::Info)
     // .format_timestamp_micros()
     .format_indent(Some(2));
 
@@ -396,7 +400,7 @@ async fn do_all(
     }
 
     let mut st_n2i = JoinSet::new();
-    for i in 1..=nr_workers {
+    for i in 1..=nr_workers * 8 {
         st_n2i.spawn(node2ip(
             i,
             node_in.clone(),
@@ -573,8 +577,27 @@ async fn node2ip(
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 4, 4)), 53),
     ];
     let mut dns = DNSClient::new(l_nameserver);
-    dns.set_timeout(Duration::from_secs(5));
+    dns.set_timeout(Duration::from_secs(3));
+    let (mut nr_millsec, mut nr_processed, mut nr_skipped) = (0_u128, 0_u64, 0_u64);
+    let mut start;
+    let mut show_time = SystemTime::now();
+    let mut delta;
     while !exit_flag {
+        if SystemTime::now()
+            .duration_since(show_time)
+            .unwrap_or_default()
+            .as_secs()
+            >= 60
+        {
+            show_time = SystemTime::now();
+            debug!(
+                "{worker_name} queried: {nr_processed}@{:.1}/s, skipped: {nr_skipped}",
+                nr_processed as f64 / (nr_millsec as f64 / 1000_f64)
+            );
+            nr_processed = 0;
+            nr_skipped = 0;
+            nr_millsec = 0;
+        }
         tokio::select! {
             _ = e_exit.notified() =>{
                 debug!("{worker_name} got exit flag");
@@ -592,7 +615,11 @@ async fn node2ip(
                 let mut _n: Node  = _node;
                 let ip: IpAddr = _n.ip.parse().unwrap_or_else(|_|IpAddr::V4(Ipv4Addr::new(0,0,0,0)));
                 if ip.is_unspecified(){
+                    start = SystemTime::now();
                     let l_real_ip = dns.query_a(_n.ip.as_str()).await.unwrap_or_default();
+                    delta = SystemTime::now().duration_since(start).unwrap_or_default().as_millis();
+                    nr_millsec += delta;
+                    nr_processed += 1;
                     if !l_real_ip.is_empty(){
                         _n.real_ip = l_real_ip[0].to_string();
                         if let Err(e) = ip_out.send(_n).await {
@@ -604,6 +631,7 @@ async fn node2ip(
                     // }
                 }
                 else{
+                    nr_skipped += 1;
                     _n.real_ip = _n.ip.clone();
                     if let Err(e) = ip_out.send(_n).await {
                         debug!("{worker_name} putting data got {e}");
@@ -876,13 +904,14 @@ async fn measure_node(
                         warn!("{cur_worker_name} proxy process exited?");
                     }
 
+                    let speed_limit: u32 = cur_conf["measure_speed_limit"].as_u64().unwrap_or(2000).try_into().unwrap();
                     let cur_proxy = format!("http://127.0.0.1:{cur_port}");
                     trace!("{cur_worker_name} cur_proxy={cur_proxy} for {_node}");
                     let client = reqwest::Client::builder()
                         .proxy(reqwest::Proxy::all(cur_proxy).unwrap())
                         .default_headers(cur_headers)
-                        .connect_timeout(Duration::from_secs(5))
-                        .timeout(Duration::from_secs(5))
+                        .connect_timeout(Duration::from_millis((speed_limit as f64 * 0.5).round() as u64))
+                        .timeout(Duration::from_millis((speed_limit as f64 * 0.8).round() as u64))
                         .build().unwrap_or_else(|e|{error!("client create failed! {e}"); reqwest::Client::builder().build().unwrap()});
 
                     let min_succ = 2;
@@ -897,7 +926,7 @@ async fn measure_node(
                     }
 
                     if !b_stop_put && nr_succ >= min_succ{
-                        if min_latency < 1000{
+                        if min_latency < speed_limit{
                             info!("~~~~~~~~~~~~~~~~ {cur_worker_name} succ {min_latency}ms {} {_node} ~~~~~~~~~~~~~~~", _node.area);
                             if let Err(e) = tx.send(_node, 999999u32 - min_latency).await {
                                 debug!("{cur_worker_name} putting data got {e}");
@@ -1177,12 +1206,13 @@ async fn dispatch(
 ) {
     let worker_name = "[dispatch]";
 
-    info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n pick_new_interval_seconds: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {}\n pick_one: {}",
+    info!("{}\n v2ray path: {}\n conf_basepath: {}\n proxy_host: {}\n pac_server_port: {}\n pick_new_interval_seconds: {}\n measure_speed_limit: {}\n proxy_http_port: {}\n proxy_socks_port: {}\n proxy_http_port_noauth: {}\n proxy_socks_port_noauth: {}\n proxy_output_file: {}\n measure_mode: {}\n pick_one: {}",
         worker_name, conf["v2ray_path"],
         conf["conf_basepath"],
         conf["proxy_host"],
         conf["pac_server_port"],
         conf["pick_new_interval_seconds"].as_u64().unwrap_or(86400),
+        conf["measure_speed_limit"].as_u64().unwrap_or(2000),
         conf["inboundsSetting"][0]["port"],
         conf["inboundsSetting"][1]["port"],
         conf["inboundsSetting"][2]["port"],
@@ -1248,18 +1278,13 @@ async fn dispatch(
 
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/mahdibland/get_v2/refs/heads/main/pub/combine.yaml"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/sub/sub_merge.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/yudou66.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodev2ray.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/ndnode.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/blues.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/nodefree.yaml"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/feat/ai-crawler-v2/nodes/merged.txt"),
+                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Barabama/FreeNodes/refs/heads/main/nodes/freeclashnode.txt"),
 
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/mheidari98/.proxy/main/all"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/LalatinaHub/Mineral/master/result/nodes"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/Mahdi0024/ProxyCollector/master/sub/proxies.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/All_Configs_Sub.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/server.txt"),
 
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/zjfb/SubCrawler/main/sub/share/all"),
@@ -1271,7 +1296,6 @@ async fn dispatch(
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/iboxz/free-v2ray-collector/main/main/mix"),
                     String::from("https://www.xrayvip.com/free.txt"),
                     String::from("https://{PROXY}/https://raw.githubusercontent.com/ndsphonemy/proxy-sub/refs/heads/main/wl.txt"),
-                    String::from("https://{PROXY}/https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/actives.txt"),
 //                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/PSG/refs/heads/main/subscriptions/xray/base64/mix"),
 //                    String::from("https://{PROXY}/https://raw.githubusercontent.com/itsyebekhe/LiveProxy/refs/heads/main/subscriptions/combined/base64/all_live.txt"),
 
@@ -1357,48 +1381,65 @@ async fn dispatch(
                     }
                 }
 
-                let mut st: JoinSet<Option<(&str, Vec<String>)>> = JoinSet::new();
+                let mut st: JoinSet<Option<(String, Vec<String>)>> = JoinSet::new();
                 st.spawn(proto::get_mibei_url(worker_name));
+                st.spawn(proto::get_v2rayclashx_url(worker_name));
 
-                for [_git_name, _url_tpl, _begin_str, _regex_str] in [
-                    ["shareclash", "https://{PROXY}/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["v2rayclashnode", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashnode/v2rayclashnode.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["freev2rayclash", "https://{PROXY}/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["freev2ray", "https://{PROXY}/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["windowsv2ray", "https://{PROXY}/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["clashfreev2ray", "https://{PROXY}/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["v2rayclashx", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashx/v2rayclashx.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ["v2rayclashnodes", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashnodes/v2rayclashnodes.github.io/refs/heads/main/README.md", "V2ray订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
-                    ] {
-
-                    let mut _url: String;
-                    if let Some(_proxy) = git_proxies.choose(&mut thread_rng()) {
-                        _url = _url_tpl.replace("{PROXY}", _proxy);
-                    } else {
-                        warn!("get random proxy failed!");
-                        break;
-                    }
-
-                    if pick_one {
-                        let  (_, one_urls) = proto::get_githubreadme_url(worker_name, _git_name, &_url, _begin_str, _regex_str).await.unwrap_or_default();
-                        if !one_urls.is_empty() {
-                            for url in one_urls {
-                                urls.push(url);
-                            }
-                            debug!("{worker_name} {_git_name} urls added to urls.");
+                let l_githubreadme: Vec<[&str; 4]> = vec![
+                    // ["shareclash", "https://{PROXY}/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["v2rayclashnode", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashnode/v2rayclashnode.github.io/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["freev2rayclash", "https://{PROXY}/https://raw.githubusercontent.com/freev2rayclash/freev2rayclash.github.io/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["freev2ray", "https://{PROXY}/https://raw.githubusercontent.com/free-v2ray/free-v2ray.github.io/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["windowsv2ray", "https://{PROXY}/https://raw.githubusercontent.com/windowsv2ray/windowsv2ray.github.io/refs/heads/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["clashfreev2ray", "https://{PROXY}/https://raw.githubusercontent.com/clashfreev2ray/clashfreev2ray.github.io/refs/heads/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["v2rayclashx", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashx/v2rayclashx.github.io/refs/heads/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                    // ["v2rayclashnodes", "https://{PROXY}/https://raw.githubusercontent.com/v2rayclashnodes/v2rayclashnodes.github.io/refs/heads/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
+                ];
+                if !l_githubreadme.is_empty() {
+                    for [_git_name, _url_tpl, _begin_str, _regex_str] in l_githubreadme {
+                        let mut _url: String;
+                        if let Some(_proxy) = git_proxies.choose(&mut thread_rng()) {
+                            _url = _url_tpl.replace("{PROXY}", _proxy);
+                        } else {
+                            warn!("get random proxy failed!");
+                            break;
                         }
-                    } else {
-                        st.spawn(async move{
-                            proto::get_githubreadme_url(worker_name, _git_name, &_url, _begin_str, _regex_str).await
-                        });
 
+                        if pick_one {
+                            let (_, one_urls) = proto::get_githubreadme_url(
+                                worker_name,
+                                _git_name,
+                                &_url,
+                                _begin_str,
+                                _regex_str,
+                            )
+                            .await
+                            .unwrap_or_default();
+                            if !one_urls.is_empty() {
+                                for url in one_urls {
+                                    urls.push(url);
+                                }
+                                debug!("{worker_name} {_git_name} url(s) added to urls.");
+                            }
+                        } else {
+                            st.spawn(async move {
+                                proto::get_githubreadme_url(
+                                    worker_name,
+                                    _git_name,
+                                    &_url,
+                                    _begin_str,
+                                    _regex_str,
+                                )
+                                .await
+                            });
+                        }
                     }
                 }
 
                 while let Some(rslt) = st.join_next().await {
                     if let Ok(Some((_gitname, _urls))) = rslt {
                         debug!(
-                            "{worker_name} {_gitname} {} urls added to urls.",
+                            "{worker_name} {_gitname} {} url(s) added to urls.",
                             _urls.len()
                         );
                         if !_urls.is_empty() {
@@ -1561,7 +1602,7 @@ async fn dispatch(
             _ = e_candidate_change.notified() =>{
                 info!("{worker_name} candidate changed to {}", candidate_in.len());
             }
-            _ = tokio::time::sleep(Duration::from_secs(if recent_put {120} else {60}))=> {
+            _ = tokio::time::sleep(Duration::from_secs(if recent_put {90} else {45}))=> {
                 // debug!("{worker_name} Timed out");
                 print!("~");
                 let _ = io::stdout().flush();

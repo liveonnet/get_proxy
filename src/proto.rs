@@ -10,6 +10,8 @@ use serde_json::json;
 use serde_json::Value;
 use serde_yaml::Value as Yamlv;
 use std::collections::HashMap;
+// use std::fmt::Debug;
+// use std::fmt::Pointer;
 use std::time::Duration;
 use tokio::time;
 use url::Url;
@@ -398,7 +400,13 @@ pub async fn data2node_one(
         nr += 1;
 
         if nr % 10 == 0 {
-            time::sleep(Duration::from_millis(20)).await;
+            // 降速，给别的协程执行机会
+            time::sleep(Duration::from_millis(100)).await;
+        }
+
+        if nr >= 99 {
+            debug!("{worker_name} each source only process head {nr}, break !!!");
+            break;
         }
     }
 }
@@ -577,7 +585,14 @@ pub async fn parse_yaml(
             nr += 1;
 
             if nr % 10 == 0 {
-                time::sleep(Duration::from_millis(20)).await;
+                // 降速，给别的协程执行机会
+                time::sleep(Duration::from_millis(100)).await;
+            }
+
+            // debugonly
+            if nr >= 99 {
+                debug!("{worker_name} each source only process head {nr}, break !!!");
+                break;
             }
         }
     } else {
@@ -588,18 +603,66 @@ pub async fn parse_yaml(
     }
 }
 
-pub async fn get_mibei_url<'a>(worker_name: &str) -> Option<(&'a str, Vec<String>)> {
+pub async fn get_v2rayclashx_url(worker_name: &str) -> Option<(String, Vec<String>)> {
+    trace!("{worker_name} try to get v2rayclashx url...");
+    let today = chrono::Local::now().date_naive();
+    let s_today = today.format("%Y-%m-%d").to_string();
+    let url =
+        format!("https://v2rayclashx.github.io/newly-discovered-nodes/index.html?date={s_today}");
+    let mut urls = vec![];
+    match tools::fetch_dynamic_page(
+        url.as_str(),
+        None,
+        Duration::from_secs(30),
+        Duration::from_secs(30),
+    )
+    .await
+    {
+        Ok(html) => {
+            debug!("{worker_name} got {} bytes from {url}", html.len());
+            if let Some(idx) = html.find("v2ray订阅链接") {
+                trace!(
+                    "{worker_name} got keyword at idx {idx}, {}",
+                    &html[idx..idx + 300]
+                );
+                let today = chrono::Local::now().date_naive();
+                let s_today = today.format("%Y%m%d").to_string();
+                let reg_str = format!(
+                    r"(https://node\.freeclashnode\.com/uploads/{}/{}/.+?-{}\.txt)",
+                    &s_today[..4],
+                    &s_today[4..6],
+                    s_today
+                );
+                trace!("{worker_name} {reg_str:?}");
+
+                let re = Regex::new(&reg_str).unwrap();
+                for (_, [_url]) in re.captures_iter(&html[idx..]).map(|c| c.extract()) {
+                    urls.push(String::from(_url));
+                }
+                debug!("{worker_name} got {} url(s) from {url}", urls.len());
+            } else {
+                warn!("{worker_name} keyword not found !");
+            }
+        }
+        Err(e) => {
+            warn!("{worker_name} can't get url(s) from {url}, err: {e}");
+        }
+    }
+
+    Some((url, urls))
+}
+
+pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
     trace!("{worker_name} try to get mibei url...");
     let url = "https://www.mibei77.com/";
     let mut ret = None;
     let mut lastest_url = String::new();
-    let client = Client::new();
-    match client
-        .get(url)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-    {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10)) // 总超时：10秒
+        .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
+        .build()
+        .unwrap();
+    match client.get(url).send().await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
@@ -621,7 +684,7 @@ pub async fn get_mibei_url<'a>(worker_name: &str) -> Option<(&'a str, Vec<String
 
     if !lastest_url.is_empty() {
         trace!("{worker_name} got {lastest_url}");
-        match reqwest::get(lastest_url.clone()).await {
+        match client.get(lastest_url.clone()).send().await {
             Ok(o) => {
                 if let Ok(s) = o.text().await {
                     trace!("{worker_name} got {} bytes from {lastest_url}", s.len());
@@ -631,7 +694,7 @@ pub async fn get_mibei_url<'a>(worker_name: &str) -> Option<(&'a str, Vec<String
                         .unwrap();
                     match re.find(&s) {
                         Some(x) => {
-                            ret = Some((url, vec![String::from(x.as_str())]));
+                            ret = Some((String::from(url), vec![String::from(x.as_str())]));
                             trace!("{worker_name} got mibei url {ret:?}");
                         }
                         None => {
@@ -656,7 +719,12 @@ pub async fn get_tolinkshare_data(worker_name: &str) -> Option<(String, String)>
         "https://ghfast.top/https://raw.githubusercontent.com/tolinkshare/freenode/main/README.md";
     let mut ret = (String::from(url), String::new());
     let mut content = String::new();
-    match reqwest::get(url).await {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10)) // 总超时：10秒
+        .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
+        .build()
+        .unwrap();
+    match client.get(url).send().await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
@@ -689,7 +757,12 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)> {
         "https://ghfast.top/https://raw.githubusercontent.com/VpnNetwork01/vpn-net/main/README.md";
     let mut ret = (String::from(url), String::new());
     let mut content = String::new();
-    match reqwest::get(url).await {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10)) // 总超时：10秒
+        .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
+        .build()
+        .unwrap();
+    match client.get(url).send().await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
@@ -717,16 +790,21 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)> {
     Some(ret)
 }
 
-pub async fn get_githubreadme_url<'a>(
+pub async fn get_githubreadme_url(
     worker_name: &str,
-    git_name: &'a str,
+    git_name: &str,
     url: &str,
     begin_str: &str,
     regex_str: &str,
-) -> Option<(&'a str, Vec<String>)> {
+) -> Option<(String, Vec<String>)> {
     let mut ret = vec![];
     let mut content = String::new();
-    match reqwest::get(url).await {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10)) // 总超时：10秒
+        .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
+        .build()
+        .unwrap();
+    match client.get(url).send().await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
                 trace!("{worker_name} get {} bytes from {url}", s.len());
@@ -749,7 +827,7 @@ pub async fn get_githubreadme_url<'a>(
         trace!("{worker_name} got {} url(s) content from {url}", ret.len());
     }
 
-    Some((git_name, ret))
+    Some((String::from(git_name), ret))
 }
 
 // 直接返回"trjan:://xxxx"形式的节点列表
@@ -761,7 +839,12 @@ pub async fn get_sharkdoor_url(worker_name: &str) -> Option<Vec<(String, String)
     let url = s_url.as_str();
     let mut ret = vec![];
     let mut content = String::new();
-    match reqwest::get(url).await {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10)) // 总超时：10秒
+        .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
+        .build()
+        .unwrap();
+    match client.get(url).send().await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());

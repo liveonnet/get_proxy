@@ -48,6 +48,7 @@ pub async fn launcher_proxy(
         let cmd_x = cmd
             .arg("run")
             .creation_flags(CREATE_NEW_PROCESS_GROUP)
+            .kill_on_drop(true)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null());
@@ -55,6 +56,7 @@ pub async fn launcher_proxy(
         #[cfg(unix)]
         let mut cmd_x = cmd
             .arg("run")
+            .kill_on_drop(true)
             .process_group(0)
             .stdin(std::process::Stdio::piped())
             // .stdout(std::process::Stdio::null())

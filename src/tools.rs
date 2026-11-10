@@ -21,6 +21,10 @@ use tokio::time::timeout;
 // #[allow(unused_imports)]
 // use toml::Value as tvalue;
 use crate::node::Node;
+// use chromiumoxide::browser;
+use chromiumoxide::browser::{Browser, BrowserConfig};
+use futures::StreamExt;
+
 use regex::Regex;
 
 #[allow(unused_macros)]
@@ -28,6 +32,7 @@ macro_rules! assert_types {
     ($($var:ident : $ty:ty),*) => { $(let _: & $ty = & $var;)* }
 }
 
+// 获取内网地址
 pub fn get_lan_ip() -> String {
     let sk = UdpSocket::bind("0.0.0.0:0").unwrap();
     let r: SocketAddr = SocketAddr::from_str("8.8.8.8:80").unwrap();
@@ -232,7 +237,7 @@ pub async fn check_proxy(
                     trace!("{worker_name} failed {node} {e}");
                     break;
                 }
-                if timeout(Duration::from_secs(2), e_exit.notified())
+                if timeout(Duration::from_millis(100), e_exit.notified())
                     .await
                     .is_ok()
                 {
@@ -251,6 +256,7 @@ pub async fn check_proxy(
 
 #[allow(dead_code)]
 // #[cfg(unix)]
+// 获取linux下的发行版信息
 pub async fn get_distributor_id() -> String {
     let re = Regex::new(r"(?mR)^ID=(\w+)$").unwrap();
     let mut s = String::new();
@@ -284,4 +290,94 @@ pub async fn get_distributor_id() -> String {
     }
 
     s
+}
+
+// 获取动态渲染后的页面 HTML
+///
+/// # 参数
+/// * `url`: 要抓取的目标 URL
+/// * `proxy`: 可选的代理服务器地址，格式如 "http://host:port" 或 "socks5://host:port"
+///   注意：如果代理需要认证，格式为 "http://user:pass@host:port"
+/// * `launch_timeout`: 浏览器启动和连接的超时时间
+/// * `request_timeout`: 页面导航和渲染的最大等待时间
+///
+/// # 返回
+/// 渲染完成后的 HTML 字符串
+pub async fn fetch_dynamic_page(
+    url: &str,
+    proxy: Option<String>,
+    launch_timeout: Duration,
+    request_timeout: Duration,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    // 1. 构建浏览器启动参数
+    let mut config_builder = BrowserConfig::builder().no_sandbox(); // 通常在容器或自动化环境中需要
+
+    // 2. 如果提供了代理，添加到启动参数中
+    if let Some(proxy_server) = proxy {
+        // Chromium 接受 --proxy-server 参数
+        config_builder = config_builder.args(vec![format!("--proxy-server={}", proxy_server)]);
+    }
+
+    config_builder = config_builder.request_timeout(request_timeout);
+
+    let config = config_builder.build()?;
+
+    // 3. 启动浏览器，应用连接超时
+    let (mut browser, mut handler) = timeout(launch_timeout, Browser::launch(config))
+        .await
+        .map_err(|_| "Browser launch timed out")??;
+    // info!("browser launched.");
+
+    // 4. 在后台任务中处理浏览器事件流
+    let browser_handle = tokio::spawn(async move {
+        while let Some(h) = handler.next().await {
+            if h.is_err() {
+                break;
+            }
+        }
+    });
+
+    // 5. 创建新页面
+    let page = browser.new_page(url).await?;
+    // trace!("browser open new page {url} done.");
+    let html = page.content().await?;
+    // trace!("browser got {} bytes from page {url}.", html.len());
+
+    // 6. 导航到目标 URL，并应用加载超时
+    // let navigation_result = timeout(request_timeout, page.goto(url)).await;
+
+    // let html = match navigation_result {
+    // let html = match page {
+    //     Ok(Ok(_)) => {
+    //         // 导航成功
+
+    //         // 7. 等待动态内容渲染
+    //         // 简单等待一段时间让 JS 执行，实际项目中可根据特定元素存在与否来判断
+    //         tokio::time::sleep(Duration::from_secs(3)).await;
+
+    //         // 8. 获取渲染后的 HTML
+    //         page.content().await?
+    //     }
+    //     Ok(Err(e)) => {
+    //         // 导航失败
+    //         page.close().await.ok();
+    //         browser.close().await.ok();
+    //         browser_handle.abort();
+    //         return Err(Box::new(e));
+    //     }
+    //     Err(_) => {
+    //         // 加载超时
+    //         page.close().await.ok();
+    //         browser.close().await.ok();
+    //         browser_handle.abort();
+    //         return Err("Page load timed out".into());
+    //     }
+    // };
+
+    // 9. 清理资源
+    page.close().await.ok();
+    browser.close().await.ok();
+    browser_handle.abort();
+
+    Ok(html)
 }
