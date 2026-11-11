@@ -690,8 +690,8 @@ pub async fn get_mibei_url(worker_name: &str, source: &str) -> Option<(String, V
     if !lastest_url.is_empty() {
         trace!("{worker_name} got {lastest_url}");
         match client.get(lastest_url.clone()).send().await {
-            Ok(o) => {
-                if let Ok(s) = o.text().await {
+            Ok(o) => match o.text().await {
+                Ok(s) => {
                     trace!(
                         "{worker_name} {source} got {} bytes from {lastest_url}",
                         s.len()
@@ -709,10 +709,11 @@ pub async fn get_mibei_url(worker_name: &str, source: &str) -> Option<(String, V
                             warn!("{worker_name} {source} can't found mibei url");
                         }
                     };
-                } else {
+                }
+                _ => {
                     warn!("{worker_name} {source} can't get content from {lastest_url} !!!");
                 }
-            }
+            },
             Err(e) => {
                 warn!("{worker_name} {source} can't get content from {lastest_url}, err: {e} !!!");
             }
@@ -733,14 +734,15 @@ pub async fn get_tolinkshare_data(worker_name: &str) -> Option<(String, String)>
         .build()
         .unwrap();
     match client.get(url).send().await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
+        Ok(o) => match o.text().await {
+            Ok(s) => {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
                 content = s;
-            } else {
+            }
+            _ => {
                 warn!("{worker_name} can't get content from {url} !!!");
             }
-        }
+        },
         Err(e) => {
             warn!("{worker_name} fetching {url} got err {e}");
         }
@@ -771,14 +773,15 @@ pub async fn get_vpnnet_data(worker_name: &str) -> Option<(String, String)> {
         .build()
         .unwrap();
     match client.get(url).send().await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
+        Ok(o) => match o.text().await {
+            Ok(s) => {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
                 content = s;
-            } else {
+            }
+            _ => {
                 warn!("{worker_name} can't get content from {url} !!!");
             }
-        }
+        },
         Err(e) => {
             trace!("{worker_name} fetching {url} got err {e}");
         }
@@ -813,14 +816,15 @@ pub async fn get_githubreadme_url(
         .build()
         .unwrap();
     match client.get(url).send().await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
+        Ok(o) => match o.text().await {
+            Ok(s) => {
                 trace!("{worker_name} get {} bytes from {url}", s.len());
                 content = s;
-            } else {
+            }
+            _ => {
                 warn!("{worker_name} can't get content from {url} !!!");
             }
-        }
+        },
         Err(e) => {
             trace!("{worker_name} fetching {url} got err {e}");
         }
@@ -853,14 +857,15 @@ pub async fn get_sharkdoor_url(worker_name: &str) -> Option<Vec<(String, String)
         .build()
         .unwrap();
     match client.get(url).send().await {
-        Ok(o) => {
-            if let Ok(s) = o.text().await {
+        Ok(o) => match o.text().await {
+            Ok(s) => {
                 trace!("{worker_name} got {} byte(s) from {url}", s.len());
                 content = s;
-            } else {
+            }
+            _ => {
                 warn!("{worker_name} can't get content from {url} !!!");
             }
-        }
+        },
         Err(e) => {
             trace!("{worker_name} fetching {url} got err {e}");
         }

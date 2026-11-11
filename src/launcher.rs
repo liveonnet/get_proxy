@@ -73,29 +73,33 @@ pub async fn launcher_proxy(
 
         match cmd_x.spawn() {
             Ok(mut child) => {
-                if let Some(h_stdin) = child.stdin.take() {
-                    let mut stdin = BufWriter::new(h_stdin);
-                    let _ = stdin.write_all(setting.as_bytes()).await;
-                    let _ = stdin.flush().await;
+                match child.stdin.take() {
+                    Some(h_stdin) => {
+                        let mut stdin = BufWriter::new(h_stdin);
+                        let _ = stdin.write_all(setting.as_bytes()).await;
+                        let _ = stdin.flush().await;
 
-                    #[cfg(windows)]
-                    drop(stdin);
+                        #[cfg(windows)]
+                        drop(stdin);
 
-                    // #[cfg(unix)]
-                    // {
-                    //     let h = stdin.into_inner();
-                    //     child.stdin = Some(h);
-                    // }
+                        // #[cfg(unix)]
+                        // {
+                        //     let h = stdin.into_inner();
+                        //     child.stdin = Some(h);
+                        // }
 
-                    if wait_start(worker_name, node, &mut child, None, wait_millisecs, false).await
-                    {
-                        // trace!("{worker_name} setting: {}", setting.to_string());  // debug only
-                        return Some((child, String::new()));
-                    } else {
-                        // trace!("{worker_name} setting: {}", setting.to_string());  // debug only
+                        if wait_start(worker_name, node, &mut child, None, wait_millisecs, false)
+                            .await
+                        {
+                            // trace!("{worker_name} setting: {}", setting.to_string());  // debug only
+                            return Some((child, String::new()));
+                        } else {
+                            // trace!("{worker_name} setting: {}", setting.to_string());  // debug only
+                        }
                     }
-                } else {
-                    error!("{worker_name} get stdin failed!");
+                    _ => {
+                        error!("{worker_name} get stdin failed!");
+                    }
                 }
             }
             Err(err) => {
@@ -181,85 +185,88 @@ async fn wait_start(
     let mut ret = true;
 
     let pid = child.id().unwrap_or_default();
-    if let Some(h_stdout) = child.stdout.take() {
-        let re = Regex::new(r"\[Warning\] core: Xray .+? started").unwrap();
-        let mut stdout = BufReader::new(h_stdout);
-        let mut line = String::new();
-        let now = time::Instant::now();
-        loop {
-            line.clear();
-            match timeout(Duration::from_millis(max_wait), stdout.read_line(&mut line)).await {
-                Err(_) => {
-                    trace!(
-                        "{worker_name} {node} pid {pid} read stdout timeout! {}ms",
-                        now.elapsed().as_millis()
-                    );
-                    // ret = false;
-                    break;
-                }
-                Ok(Err(err)) => {
-                    warn!("{worker_name} {node} pid {pid} read stdout error: {err}");
-                    ret = false;
-                    break;
-                }
-                Ok(Ok(0)) => {
-                    // if let Some(ref cf) = file_path {
-                    if false {
-                        // let to_file = format!("{cf}.eof");
-                        // match copy(cf, to_file.as_str()) {
-                        //     Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
-                        //     Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
-                        // }
-                    } else {
-                        trace!("{worker_name} {node} pid {pid} read stdout reached EOF");
-                        // if let Some(ref cf) = file_path {
-                        //     let to_file = format!("{cf}.eof");
-                        //     match copy(cf, to_file.as_str()) {
-                        //         Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
-                        //         Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
-                        //     }
-                        // }
+    match child.stdout.take() {
+        Some(h_stdout) => {
+            let re = Regex::new(r"\[Warning\] core: Xray .+? started").unwrap();
+            let mut stdout = BufReader::new(h_stdout);
+            let mut line = String::new();
+            let now = time::Instant::now();
+            loop {
+                line.clear();
+                match timeout(Duration::from_millis(max_wait), stdout.read_line(&mut line)).await {
+                    Err(_) => {
+                        trace!(
+                            "{worker_name} {node} pid {pid} read stdout timeout! {}ms",
+                            now.elapsed().as_millis()
+                        );
+                        // ret = false;
+                        break;
                     }
-                    ret = false;
-                    break;
-                }
-                Ok(Ok(_)) => {
-                    // debug!("{worker_name} {node} {pid} read from stdout got {size_got} bytes: {}", line.trim_end());
-                    match re.find(&line) {
-                        Some(_) => {
-                            if real_use {
-                                info!(
-                                    "{worker_name} {node} pid {pid} started in {}ms",
-                                    now.elapsed().as_millis()
-                                );
-                            } else {
-                                // info!("{worker_name} {node} pid {pid} started in {}ms", now.elapsed().as_millis());
+                    Ok(Err(err)) => {
+                        warn!("{worker_name} {node} pid {pid} read stdout error: {err}");
+                        ret = false;
+                        break;
+                    }
+                    Ok(Ok(0)) => {
+                        // if let Some(ref cf) = file_path {
+                        if false {
+                            // let to_file = format!("{cf}.eof");
+                            // match copy(cf, to_file.as_str()) {
+                            //     Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
+                            //     Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
+                            // }
+                        } else {
+                            trace!("{worker_name} {node} pid {pid} read stdout reached EOF");
+                            // if let Some(ref cf) = file_path {
+                            //     let to_file = format!("{cf}.eof");
+                            //     match copy(cf, to_file.as_str()) {
+                            //         Ok(_) => { warn!("{worker_name} {node} pid {pid} read stdout reached EOF, conf file copied to {to_file}");},
+                            //         Err(e) => { warn!("{worker_name} {node} conf file copy got error!!! {e}");}
+                            //     }
+                            // }
+                        }
+                        ret = false;
+                        break;
+                    }
+                    Ok(Ok(_)) => {
+                        // debug!("{worker_name} {node} {pid} read from stdout got {size_got} bytes: {}", line.trim_end());
+                        match re.find(&line) {
+                            Some(_) => {
+                                if real_use {
+                                    info!(
+                                        "{worker_name} {node} pid {pid} started in {}ms",
+                                        now.elapsed().as_millis()
+                                    );
+                                } else {
+                                    // info!("{worker_name} {node} pid {pid} started in {}ms", now.elapsed().as_millis());
+                                }
+                                break;
                             }
-                            break;
-                        }
-                        None => {
-                            trace!(
-                                "{worker_name} {node} pid {pid} got stdout: {}",
-                                line.trim_end()
-                            );
-                            continue;
-                        }
-                    };
+                            None => {
+                                trace!(
+                                    "{worker_name} {node} pid {pid} got stdout: {}",
+                                    line.trim_end()
+                                );
+                                continue;
+                            }
+                        };
+                    }
                 }
             }
-        }
 
-        #[cfg(windows)]
-        drop(stdout);
+            #[cfg(windows)]
+            drop(stdout);
 
-        #[cfg(unix)]
-        {
-            let h = stdout.into_inner();
-            child.stdout = Some(h);
+            #[cfg(unix)]
+            {
+                let h = stdout.into_inner();
+                child.stdout = Some(h);
+            }
         }
-    } else {
-        error!("{worker_name} {node} pid {pid} get stdout failed!");
-        ret = false;
+        _ => {
+            error!("{worker_name} {node} pid {pid} get stdout failed!");
+            ret = false;
+        }
     }
 
     if !ret {
