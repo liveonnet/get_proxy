@@ -4,3 +4,4 @@ conf.json
 src/*.swp
 *.swp
 clear.sh
+Cargo.lock

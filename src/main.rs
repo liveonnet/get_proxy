@@ -332,13 +332,13 @@ async fn do_all(
     pick_one: bool,
 ) -> MyResult<String> {
     let b_stop_process = Arc::new(RwLock::new(false));
-    let (url_out, url_in) = bounded(10);
-    let (data_out, data_in) = bounded(10);
-    let (node_out, node_in) = bounded(300); // todo: 调整容量
-    let (ip_out, ip_in) = bounded(100);
-    let (area_out, area_in) = bounded(50);
-    let (uniq_out, uniq_in) = bounded(50); // todo: 调整容量
-    let (good_out, good_in) = async_priority_channel::bounded::<Node, u32>(50); // todo: 调整容量
+    let (url_tx, url_rx) = bounded(10);
+    let (data_tx, data_rx) = bounded(10);
+    let (node_tx, node_rx) = bounded(300); // todo: 调整容量
+    let (ip_tx, ip_rx) = bounded(100);
+    let (area_tx, area_rx) = bounded(50);
+    let (uniq_tx, uniq_rx) = bounded(50); // todo: 调整容量
+    let (good_tx, good_rx) = async_priority_channel::bounded::<Node, u32>(50); // todo: 调整容量
     let max_candidate: u64 = conf["candidate_max"].as_u64().unwrap();
     let (candidate_out, candidate_in) = async_priority_channel::bounded::<Node, u32>(max_candidate);
     let e_clear = Arc::new(Notify::new());
@@ -347,13 +347,13 @@ async fn do_all(
 
     tokio::spawn(dispatch(
         conf.clone(),
-        url_in.clone(),
-        url_out.clone(),
-        data_in.clone(),
-        data_out.clone(),
-        node_in.clone(),
-        uniq_in.clone(),
-        good_in.clone(),
+        url_rx.clone(),
+        url_tx.clone(),
+        data_rx.clone(),
+        data_tx.clone(),
+        node_rx.clone(),
+        uniq_rx.clone(),
+        good_rx.clone(),
         candidate_in.clone(),
         e_candidate_change.clone(),
         e_clear.clone(),
@@ -381,8 +381,8 @@ async fn do_all(
     for i in 1..=nr_workers {
         st_u2d.spawn(url2data(
             i,
-            url_in.clone(),
-            data_out.clone(),
+            url_rx.clone(),
+            data_tx.clone(),
             e_exit.clone(),
             b_stop_process.clone(),
         ));
@@ -392,8 +392,8 @@ async fn do_all(
     for i in 1..=nr_workers {
         st_d2n.spawn(data2node(
             i,
-            data_in.clone(),
-            node_out.clone(),
+            data_rx.clone(),
+            node_tx.clone(),
             e_exit.clone(),
             b_stop_process.clone(),
         ));
@@ -403,8 +403,8 @@ async fn do_all(
     for i in 1..=nr_workers * 8 {
         st_n2i.spawn(node2ip(
             i,
-            node_in.clone(),
-            ip_out.clone(),
+            node_rx.clone(),
+            ip_tx.clone(),
             e_exit.clone(),
             b_stop_process.clone(),
         ));
@@ -412,8 +412,8 @@ async fn do_all(
 
     tokio::spawn(ip2area(
         1,
-        ip_in.clone(),
-        area_out.clone(),
+        ip_rx.clone(),
+        area_tx.clone(),
         e_exit.clone(),
         b_stop_process.clone(),
         conf.clone(),
@@ -422,27 +422,27 @@ async fn do_all(
     if false {
         // debugonly
         if let Some(s) = tools::read_file("d:/tmp.txt") {
-            if let Err(e) = data_out.send((String::from("xxx"), s)).await {
+            if let Err(e) = data_tx.send((String::from("xxx"), s)).await {
                 debug!("putting data got err {e}");
             }
         }
     }
 
     tokio::spawn(uniq(
-        area_in.clone(),
-        uniq_out.clone(),
+        area_rx.clone(),
+        uniq_tx.clone(),
         e_clear.clone(),
         e_exit.clone(),
         b_stop_process.clone(),
     ));
     tokio::spawn(filter_bad_ip(
-        uniq_in.clone(),
-        good_out.clone(),
+        uniq_rx.clone(),
+        good_tx.clone(),
         e_exit.clone(),
         b_stop_process.clone(),
     ));
     tokio::spawn(measure_node(
-        good_in.clone(),
+        good_rx.clone(),
         candidate_out.clone(),
         e_candidate_change.clone(),
         e_exit.clone(),
@@ -466,8 +466,8 @@ async fn do_all(
 
 async fn url2data(
     idx: usize,
-    url_in: Receiver<String>,
-    data_out: Sender<(String, String)>,
+    url_rx: Receiver<String>,
+    data_tx: Sender<(String, String)>,
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
@@ -484,7 +484,7 @@ async fn url2data(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok(url) = url_in.recv() =>{
+            Ok(url) = url_rx.recv() =>{
                 {
                     let b_stop = b_stop.read().await;
                     if *b_stop {
@@ -501,7 +501,7 @@ async fn url2data(
                                 warn!("{worker_name} got {} byte(s) data from {url}", s.len());
                             }
 
-                            if let Err(e) = data_out.send((url, s)).await {
+                            if let Err(e) = data_tx.send((url, s)).await {
                                 debug!("{worker_name} putting data got err {e}");
                             }
                             tokio::time::sleep(Duration::from_millis(20)).await;
@@ -520,8 +520,8 @@ async fn url2data(
 
 async fn data2node(
     idx: usize,
-    data_in: Receiver<(String, String)>,
-    node_out: Sender<Node>,
+    data_rx: Receiver<(String, String)>,
+    node_tx: Sender<Node>,
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
@@ -534,7 +534,7 @@ async fn data2node(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok((url, data)) = data_in.recv() =>{
+            Ok((url, data)) = data_rx.recv() =>{
                 {
                     let b_stop = b_stop.read().await;
                     if *b_stop {
@@ -544,9 +544,9 @@ async fn data2node(
                 }
 
                 if url.ends_with(".yaml") || url.ends_with(".yml") {
-                    proto::parse_yaml(&worker_name, &data, &url, &node_out).await;
+                    proto::parse_yaml(&worker_name, &data, &url, &node_tx).await;
                 } else{
-                    proto::data2node_one(&worker_name, &data, &url, &node_out).await;
+                    proto::data2node_one(&worker_name, &data, &url, &node_tx).await;
                 }
 
                 {
@@ -565,8 +565,8 @@ async fn data2node(
 
 async fn node2ip(
     idx: usize,
-    node_in: Receiver<Node>,
-    ip_out: Sender<Node>,
+    node_rx: Receiver<Node>,
+    ip_tx: Sender<Node>,
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
@@ -576,10 +576,10 @@ async fn node2ip(
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53),
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 4, 4)), 53),
         // SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 26, 56, 26)), 53),
-        // SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 53),
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 53),
     ];
     let mut dns = DNSClient::new(l_nameserver);
-    dns.set_timeout(Duration::from_secs(3));
+    dns.set_timeout(Duration::from_secs(5));
     let (mut nr_millsec, mut nr_processed, mut nr_skipped) = (0_u128, 0_u64, 0_u64);
     let mut start;
     let mut show_time = SystemTime::now();
@@ -605,7 +605,7 @@ async fn node2ip(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok(mut _node) = node_in.recv() =>{
+            Ok(mut _node) = node_rx.recv() =>{
                 {
                     let b = b_stop.read().await;
                     if *b{
@@ -624,7 +624,7 @@ async fn node2ip(
                     nr_processed += 1;
                     if !l_real_ip.is_empty(){
                         _n.real_ip = l_real_ip[0].to_string();
-                        if let Err(e) = ip_out.send(_n).await {
+                        if let Err(e) = ip_tx.send(_n).await {
                             debug!("{worker_name} putting data got {e}");
                         }
                     }
@@ -635,7 +635,7 @@ async fn node2ip(
                 else{
                     nr_skipped += 1;
                     _n.real_ip = _n.ip.clone();
-                    if let Err(e) = ip_out.send(_n).await {
+                    if let Err(e) = ip_tx.send(_n).await {
                         debug!("{worker_name} putting data got {e}");
                     }
                 }
@@ -649,8 +649,8 @@ async fn node2ip(
 
 async fn ip2area(
     idx: usize,
-    ip_in: Receiver<Node>,
-    area_out: Sender<Node>,
+    ip_rx: Receiver<Node>,
+    area_tx: Sender<Node>,
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
     conf: Arc<Value>,
@@ -665,7 +665,7 @@ async fn ip2area(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok(mut _node) = ip_in.recv() =>{
+            Ok(mut _node) = ip_rx.recv() =>{
                 {
                     let b = b_stop.read().await;
                     if *b{
@@ -681,7 +681,7 @@ async fn ip2area(
                     }else{
                         // 带冒号的认为是ipv6，直接认为是允许的area
                         _node.area = String::new();
-                        if let Err(e) = area_out.send(_node).await {
+                        if let Err(e) = area_tx.send(_node).await {
                             debug!("{worker_name} putting data got {e}");
                         };
                     }
@@ -689,7 +689,7 @@ async fn ip2area(
                 }
                 if p_area.is_match(loc.country.as_str()) {
                     _node.area = loc.country.clone();
-                    if let Err(e) = area_out.send(_node).await {
+                    if let Err(e) = area_tx.send(_node).await {
                         debug!("{worker_name} putting data got {e}");
                         break;
                     };
@@ -702,8 +702,8 @@ async fn ip2area(
 }
 
 async fn uniq(
-    area_in: Receiver<Node>,
-    uniq_out: Sender<Node>,
+    area_rx: Receiver<Node>,
+    uniq_tx: Sender<Node>,
     e_clear: Arc<Notify>,
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
@@ -720,7 +720,7 @@ async fn uniq(
             _ = e_clear.notified() =>{
                 st.clear();
             },
-            Ok(_node) = area_in.recv() =>{
+            Ok(_node) = area_rx.recv() =>{
                 {
                     let b = b_stop.read().await;
                     if *b{
@@ -732,7 +732,7 @@ async fn uniq(
                 Hash::hash(&_node, &mut state);
                 let _hash_value = state.finish();
                 if st.insert(_hash_value) {
-                    if let Err(e) = uniq_out.send(_node).await {
+                    if let Err(e) = uniq_tx.send(_node).await {
                         debug!("{worker_name} putting data got {e}");
                     };
                     tokio::time::sleep(Duration::from_millis(10)).await;
@@ -748,8 +748,8 @@ async fn uniq(
 }
 
 async fn filter_bad_ip(
-    uniq_in: Receiver<Node>,
-    good_out: async_priority_channel::Sender<Node, u32>,
+    uniq_rx: Receiver<Node>,
+    good_tx: async_priority_channel::Sender<Node, u32>,
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
@@ -764,7 +764,7 @@ async fn filter_bad_ip(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok(_node) = uniq_in.recv() =>{
+            Ok(_node) = uniq_rx.recv() =>{
                 {
                     let b = b_stop.read().await;
                     if *b{
@@ -773,7 +773,7 @@ async fn filter_bad_ip(
                     }
                 }
 
-                let tx = good_out.clone();
+                let tx = good_tx.clone();
                 let cur_b_stop = b_stop.clone();
                 let task = tokio::spawn(async move{
                     let addr = format!("{}:{}", _node.real_ip, _node.port).to_socket_addrs().unwrap().next().unwrap();
@@ -820,8 +820,8 @@ async fn filter_bad_ip(
 }
 
 async fn measure_node(
-    good_in: async_priority_channel::Receiver<Node, u32>,
-    candidate_out: async_priority_channel::Sender<Node, u32>,
+    good_rx: async_priority_channel::Receiver<Node, u32>,
+    candidate_tx: async_priority_channel::Sender<Node, u32>,
     e_candidate_change: Arc<Notify>,
     e_exit: Arc<Notify>,
     conf: Arc<Value>,
@@ -863,7 +863,7 @@ async fn measure_node(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok((_node, _)) = good_in.recv() =>{
+            Ok((_node, _)) = good_rx.recv() =>{
                 {
                     let b_stop = b_stop_process.read().await;
                     if *b_stop {
@@ -871,7 +871,7 @@ async fn measure_node(
                         continue;
                     }
                 }
-                let tx = candidate_out.clone();
+                let tx = candidate_tx.clone();
                 let cur_conf = conf.clone();
 
                 let cur_port: u64 = match port_rx.recv().await{
@@ -882,7 +882,7 @@ async fn measure_node(
                     }
                 };
                 let cur_port_tx = port_tx.clone();
-                let cur_good_in = good_in.clone();
+                let cur_good_in = good_rx.clone();
                 let cur_e_candidate_change = e_candidate_change.clone();
                 let cur_headers = headers.clone();
                 let cur_worker_name = format!("{}-{}", worker_name, cur_port);
@@ -976,7 +976,7 @@ async fn measure_node(
 
 async fn service(
     conf: Arc<Value>,
-    candidate_in: async_priority_channel::Receiver<Node, u32>,
+    candidate_rx: async_priority_channel::Receiver<Node, u32>,
     e_candidate_change: Arc<Notify>,
     e_ip_changed: Arc<Notify>,
     e_exit: Arc<Notify>,
@@ -1028,7 +1028,7 @@ async fn service(
                 debug!("{worker_name} got exit flag");
                 exit_flag = true;
             },
-            Ok((_node, mut _prio)) = candidate_in.recv() =>{
+            Ok((_node, mut _prio)) = candidate_rx.recv() =>{
                 _prio = 999999u32 - _prio;
                 debug!("{} pick {}ms {} {}", worker_name, _prio, _node.area, _node);
                 e_candidate_change.notify_waiters();
@@ -1190,14 +1190,14 @@ async fn service(
 
 async fn dispatch(
     conf: Arc<Value>,
-    url_in: Receiver<String>,
-    url_out: Sender<String>,
-    data_in: Receiver<(String, String)>,
-    data_out: Sender<(String, String)>,
-    node_in: Receiver<Node>,
-    uniq_in: Receiver<Node>,
-    good_in: async_priority_channel::Receiver<Node, u32>,
-    candidate_in: async_priority_channel::Receiver<Node, u32>,
+    url_rx: Receiver<String>,
+    url_tx: Sender<String>,
+    data_rx: Receiver<(String, String)>,
+    data_tx: Sender<(String, String)>,
+    node_rx: Receiver<Node>,
+    uniq_rx: Receiver<Node>,
+    good_rx: async_priority_channel::Receiver<Node, u32>,
+    candidate_rx: async_priority_channel::Receiver<Node, u32>,
     e_candidate_change: Arc<Notify>,
     e_clear: Arc<Notify>,
     e_exit: Arc<Notify>,
@@ -1240,14 +1240,14 @@ async fn dispatch(
             .unwrap_or_default()
             .as_secs()
             < 90;
-        let remain = candidate_in.len();
+        let remain = candidate_rx.len();
         if remain <= min_candidate && !recent_put {
             info!("{worker_name} TMPDBG {remain}<={min_candidate} && not recent put");
-            if url_in.is_empty()
-                && data_in.is_empty()
-                && node_in.is_empty()
-                && uniq_in.is_empty()
-                && good_in.is_empty()
+            if url_rx.is_empty()
+                && data_rx.is_empty()
+                && node_rx.is_empty()
+                && uniq_rx.is_empty()
+                && good_rx.is_empty()
             {
                 info!("{worker_name} TMPDBG all queue is empty");
                 {
@@ -1478,7 +1478,7 @@ async fn dispatch(
                     && st_recent.insert(String::from("tolinkshare"))
                     && st_recent.insert(String::from("vpnnet"))
                 {
-                    let data_out_c = data_out.clone();
+                    let data_out_c = data_tx.clone();
                     tokio::spawn(async move {
                         let _d1 = proto::get_tolinkshare_data("test").await;
                         let _d2 = proto::get_vpnnet_data("test").await;
@@ -1544,7 +1544,7 @@ async fn dispatch(
                         "{worker_name} the index {pick_index} is used: {}",
                         urls[pick_index]
                     );
-                    if let Err(e) = url_out.send(urls[pick_index].clone()).await {
+                    if let Err(e) = url_tx.send(urls[pick_index].clone()).await {
                         error!("{worker_name} put url failed!!! {e}");
                     }
                 } else {
@@ -1557,7 +1557,7 @@ async fn dispatch(
                     for (idx, url) in urls.into_iter().enumerate() {
                         if st_recent.insert(url.clone()) {
                             // 最近没有处理过的才处理，避免短期内处理重复数据源
-                            if let Err(e) = url_out.try_send(url) {
+                            if let Err(e) = url_tx.try_send(url) {
                                 error!("{worker_name} put url break at idx {idx}, cause: {e}");
                                 break;
                             }
@@ -1572,11 +1572,11 @@ async fn dispatch(
                 let b_stop = b_stop_process.read().await;
                 info!(
                     "{worker_name} in processing, url:{} data:{} node:{} uniq:{} good:{} b_stop:{}",
-                    url_in.len(),
-                    data_in.len(),
-                    node_in.len(),
-                    uniq_in.len(),
-                    good_in.len(),
+                    url_rx.len(),
+                    data_rx.len(),
+                    node_rx.len(),
+                    uniq_rx.len(),
+                    good_rx.len(),
                     *b_stop
                 );
             }
@@ -1586,7 +1586,7 @@ async fn dispatch(
                 if measure_mode {
                     debug!(
                         "{worker_name} in measure_node not stop measure node, now {}",
-                        candidate_in.len()
+                        candidate_rx.len()
                     );
                 } else {
                     {
@@ -1596,27 +1596,27 @@ async fn dispatch(
                             *b_stop = true;
                         }
                     }
-                    if !url_in.is_empty()
-                        || !data_in.is_empty()
-                        || !node_in.is_empty()
-                        || !uniq_in.is_empty()
-                        || !good_in.is_empty()
+                    if !url_rx.is_empty()
+                        || !data_rx.is_empty()
+                        || !node_rx.is_empty()
+                        || !uniq_rx.is_empty()
+                        || !good_rx.is_empty()
                     {
                         info!("{worker_name} candidate remain {remain}, clear other queues");
-                        while url_in.try_recv().is_ok() {}
-                        while data_in.try_recv().is_ok() {}
-                        while node_in.try_recv().is_ok() {}
-                        while uniq_in.try_recv().is_ok() {}
-                        while good_in.try_recv().is_ok() {}
+                        while url_rx.try_recv().is_ok() {}
+                        while data_rx.try_recv().is_ok() {}
+                        while node_rx.try_recv().is_ok() {}
+                        while uniq_rx.try_recv().is_ok() {}
+                        while good_rx.try_recv().is_ok() {}
                         info!("{worker_name} queues cleared.");
                     } else {
-                        print!("={}=", candidate_in.len());
+                        print!("={}=", candidate_rx.len());
                         let _ = io::stdout().flush();
                     }
                 }
             } else {
                 // info!("{worker_name} candidate now {}", candidate_in.len());
-                print!("_{}_", candidate_in.len());
+                print!("_{}_", candidate_rx.len());
                 let _ = io::stdout().flush();
             }
         }
@@ -1627,7 +1627,7 @@ async fn dispatch(
                 exit_flag = true;
             },
             _ = e_candidate_change.notified() =>{
-                info!("{worker_name} candidate changed to {}", candidate_in.len());
+                info!("{worker_name} candidate changed to {}", candidate_rx.len());
             }
             _ = tokio::time::sleep(Duration::from_secs(if recent_put {90} else {45}))=> {
                 // debug!("{worker_name} Timed out");
