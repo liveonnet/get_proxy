@@ -66,7 +66,7 @@ async fn test() {
     // let _ = proto::get_tolinkshare_data("test").await;
     // let _ = proto::get_vpnnet_data("test").await;
 
-    let _s = proto::get_v2rayclashx_url("test").await;
+    let _s = proto::get_v2rayclashx_url("test", "v2rayclashx").await;
     if let Some((_source, _urls)) = _s {
         debug!("{_source} {} urls got: {_urls:?}", _urls.len());
     }
@@ -323,7 +323,7 @@ async fn ctrl_c_handler(e_exit: Arc<Notify>) {
 }
 
 // 处理过程：
-// url -从链接取数据-> data -解析数据构造Node节点-> node -对节点中的域名进行解析获取ip地址-> ip -根据节点ip获取地区信息并过滤-> area -对节点进行排重-> uniq -对节点进行tcp链接测试-> good -对节点进行真实连接测试-> candidate -做为备用项使用
+// 从数据源取链接(dispatch)-> url -从链接取数据(url2data)-> data -解析数据构造Node节点(data2node)-> node -对节点中的域名进行解析获取ip地址(node2ip)-> ip -根据节点ip获取地区信息并过滤(ip2area)-> area -对节点进行排重(uniq)-> uniq -对节点进行tcp链接测试(filter_bad_ip)-> good -对节点进行真实连接测试(measure_node)-> candidate -做为备用项使用(service)
 async fn do_all(
     conf: Arc<Value>,
     e_ip_changed: &Arc<Notify>,
@@ -570,11 +570,13 @@ async fn node2ip(
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
-    let worker_name = format!("[data2ip-{idx}]");
+    let worker_name = format!("[n2ip-{idx}]");
     let mut exit_flag = false;
     let l_nameserver = vec![
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53),
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 4, 4)), 53),
+        // SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 26, 56, 26)), 53),
+        // SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 53),
     ];
     let mut dns = DNSClient::new(l_nameserver);
     dns.set_timeout(Duration::from_secs(3));
@@ -653,7 +655,7 @@ async fn ip2area(
     b_stop: Arc<RwLock<bool>>,
     conf: Arc<Value>,
 ) -> () {
-    let worker_name = format!("[ip2area-{idx}]");
+    let worker_name = format!("[i2a-{idx}]");
     let mut exit_flag = false;
     let p_area = Regex::new("日本|美国|新加坡|台湾|澳大利亚|韩国|德国|加拿大").unwrap();
     let mut wry = qqwry::QQWry::from(conf["qqwry_path"].as_str().unwrap_or_default().to_string());
@@ -729,8 +731,7 @@ async fn uniq(
                 let mut state = DefaultHasher::new();
                 Hash::hash(&_node, &mut state);
                 let _hash_value = state.finish();
-                if !st.contains(&_hash_value){
-                    st.insert(_hash_value);
+                if st.insert(_hash_value) {
                     if let Err(e) = uniq_out.send(_node).await {
                         debug!("{worker_name} putting data got {e}");
                     };
@@ -1228,6 +1229,8 @@ async fn dispatch(
         .unwrap_or(UNIX_EPOCH);
     let mut exit_flag = false;
     let mut pick_index: usize = usize::MAX;
+    let mut st_recent: HashSet<String> = HashSet::new(); // 记录近期放入过url_in队列的数据源
+    let mut nr_recent = 0; // 每次批量入url_in队列时递增，用于判断何时清空st_recent
     while !exit_flag {
         print!(".");
         let _ = io::stdout().flush();
@@ -1382,8 +1385,16 @@ async fn dispatch(
                 }
 
                 let mut st: JoinSet<Option<(String, Vec<String>)>> = JoinSet::new();
-                st.spawn(proto::get_mibei_url(worker_name));
-                st.spawn(proto::get_v2rayclashx_url(worker_name));
+                if st_recent.insert(String::from("mibei")) {
+                    st.spawn(proto::get_mibei_url(worker_name, "mibei"));
+                } else {
+                    debug!("{worker_name} mibei skip processing this loop.");
+                }
+                if st_recent.insert(String::from("xrayclashx")) {
+                    st.spawn(proto::get_v2rayclashx_url(worker_name, "xrayclashx"));
+                } else {
+                    debug!("{worker_name} xrayclashx skip processing this loop.");
+                }
 
                 let l_githubreadme: Vec<[&str; 4]> = vec![
                     // ["shareclash", "https://{PROXY}/https://raw.githubusercontent.com/shareclash/shareclash.github.io/main/README.md", "V2ray节点订阅链接", r"(?im)^-\s+(https://.+?\.txt)"],
@@ -1437,9 +1448,9 @@ async fn dispatch(
                 }
 
                 while let Some(rslt) = st.join_next().await {
-                    if let Ok(Some((_gitname, _urls))) = rslt {
-                        debug!(
-                            "{worker_name} {_gitname} {} url(s) added to urls.",
+                    if let Ok(Some((_source, _urls))) = rslt {
+                        info!(
+                            "{worker_name} {_source} {} url(s) added to urls.",
                             _urls.len()
                         );
                         if !_urls.is_empty() {
@@ -1463,7 +1474,10 @@ async fn dispatch(
                 info!("{worker_name} TMPDBG shuffle url done.");
 
                 // tolinkshare/sharkdoor data
-                if !pick_one {
+                if !pick_one
+                    && st_recent.insert(String::from("tolinkshare"))
+                    && st_recent.insert(String::from("vpnnet"))
+                {
                     let data_out_c = data_out.clone();
                     tokio::spawn(async move {
                         let _d1 = proto::get_tolinkshare_data("test").await;
@@ -1490,7 +1504,11 @@ async fn dispatch(
 
                     info!("{worker_name} TMPDBG tolinkshare/sharkdoor data added.");
                 } else {
-                    warn!("in pick_one mode, tolinkshare and sharkdoor skip processing !!!");
+                    if st_recent.contains("tolinkshare") || st_recent.contains("vpnnet") {
+                        debug!("{worker_name} tolinkshare/sharkdoor skip processing this loop.");
+                    } else {
+                        warn!("{worker_name} in pick_one mode, tolinkshare and sharkdoor skip processing !!!");
+                    }
                 }
 
                 info!("{worker_name} TMPDBG regular urls len {}", urls.len());
@@ -1515,7 +1533,7 @@ async fn dispatch(
                                 }
                             }
                             Err(e) => {
-                                error!("got error {e}");
+                                error!("{worker_name} got error {e}");
                             }
                         }
                     };
@@ -1530,14 +1548,23 @@ async fn dispatch(
                         error!("{worker_name} put url failed!!! {e}");
                     }
                 } else {
-                    info!("{worker_name} sending {} urls to url_out", urls.len());
+                    if nr_recent >= 4 {
+                        st_recent.clear();
+                        debug!("{worker_name} st_recent cleared");
+                        nr_recent = 0;
+                    }
+                    info!("{worker_name} sending {} urls to url_out ...", urls.len());
                     for (idx, url) in urls.into_iter().enumerate() {
-                        if let Err(e) = url_out.try_send(url) {
-                            error!("{worker_name} put url break at idx {idx} cause: {e}");
-                            break;
+                        if st_recent.insert(url.clone()) {
+                            // 最近没有处理过的才处理，避免短期内处理重复数据源
+                            if let Err(e) = url_out.try_send(url) {
+                                error!("{worker_name} put url break at idx {idx}, cause: {e}");
+                                break;
+                            }
                         }
                     }
-                    info!("{worker_name} urls sent done");
+                    nr_recent += 1;
+                    info!("{worker_name} urls sent done.");
                 }
 
                 time_add = SystemTime::now();

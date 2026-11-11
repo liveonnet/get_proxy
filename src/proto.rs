@@ -404,7 +404,7 @@ pub async fn data2node_one(
             time::sleep(Duration::from_millis(100)).await;
         }
 
-        if nr >= 99 {
+        if nr >= 50 {
             debug!("{worker_name} each source only process head {nr}, break !!!");
             break;
         }
@@ -590,7 +590,7 @@ pub async fn parse_yaml(
             }
 
             // debugonly
-            if nr >= 99 {
+            if nr >= 50 {
                 debug!("{worker_name} each source only process head {nr}, break !!!");
                 break;
             }
@@ -603,7 +603,7 @@ pub async fn parse_yaml(
     }
 }
 
-pub async fn get_v2rayclashx_url(worker_name: &str) -> Option<(String, Vec<String>)> {
+pub async fn get_v2rayclashx_url(worker_name: &str, source: &str) -> Option<(String, Vec<String>)> {
     trace!("{worker_name} try to get v2rayclashx url...");
     let today = chrono::Local::now().date_naive();
     let s_today = today.format("%Y-%m-%d").to_string();
@@ -619,10 +619,10 @@ pub async fn get_v2rayclashx_url(worker_name: &str) -> Option<(String, Vec<Strin
     .await
     {
         Ok(html) => {
-            debug!("{worker_name} got {} bytes from {url}", html.len());
+            trace!("{worker_name} {source} got {} bytes from {url}", html.len());
             if let Some(idx) = html.find("v2ray订阅链接") {
                 trace!(
-                    "{worker_name} got keyword at idx {idx}, {}",
+                    "{worker_name} {source} got keyword at idx {idx}, {}",
                     &html[idx..idx + 300]
                 );
                 let today = chrono::Local::now().date_naive();
@@ -633,30 +633,33 @@ pub async fn get_v2rayclashx_url(worker_name: &str) -> Option<(String, Vec<Strin
                     &s_today[4..6],
                     s_today
                 );
-                trace!("{worker_name} {reg_str:?}");
+                trace!("{worker_name} {source} {reg_str:?}");
 
                 let re = Regex::new(&reg_str).unwrap();
                 for (_, [_url]) in re.captures_iter(&html[idx..]).map(|c| c.extract()) {
                     urls.push(String::from(_url));
                 }
-                debug!("{worker_name} got {} url(s) from {url}", urls.len());
+                trace!(
+                    "{worker_name} {source} got {} url(s) from {url}",
+                    urls.len()
+                );
             } else {
-                warn!("{worker_name} keyword not found !");
+                warn!("{worker_name} {source} keyword not found !");
             }
         }
         Err(e) => {
-            warn!("{worker_name} can't get url(s) from {url}, err: {e}");
+            warn!("{worker_name} {source} can't get url(s) from {url}, err: {e}");
         }
     }
 
-    Some((url, urls))
+    Some((String::from(source), urls))
 }
 
-pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
+pub async fn get_mibei_url(worker_name: &str, source: &str) -> Option<(String, Vec<String>)> {
     trace!("{worker_name} try to get mibei url...");
     let url = "https://www.mibei77.com/";
-    let mut ret = None;
     let mut lastest_url = String::new();
+    let mut urls = vec![];
     let client = Client::builder()
         .timeout(Duration::from_secs(10)) // 总超时：10秒
         .connect_timeout(Duration::from_secs(5)) // 连接超时：5秒
@@ -665,7 +668,7 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
     match client.get(url).send().await {
         Ok(o) => {
             if let Ok(s) = o.text().await {
-                trace!("{worker_name} got {} byte(s) from {url}", s.len());
+                trace!("{worker_name} {source} got {} byte(s) from {url}", s.len());
                 let doc = Html::parse_document(s.as_str());
                 let sel = Selector::parse("#index-tab-main > posts:nth-child(1) > div.item-body.flex.xx.flex1.jsb > h2 > a").unwrap();
                 if let Some(_item) = doc.select(&sel).next() {
@@ -673,12 +676,12 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
                         lastest_url = String::from(x);
                     }
                 } else {
-                    warn!("{worker_name} can\'t find lastest page url!!!");
+                    warn!("{worker_name} {source} can\'t find lastest page url!!!");
                 }
             }
         }
         Err(e) => {
-            warn!("{worker_name} fetching {url} got err {e}");
+            warn!("{worker_name} {source} fetching {url} got err {e}");
         }
     }
 
@@ -687,31 +690,34 @@ pub async fn get_mibei_url(worker_name: &str) -> Option<(String, Vec<String>)> {
         match client.get(lastest_url.clone()).send().await {
             Ok(o) => {
                 if let Ok(s) = o.text().await {
-                    trace!("{worker_name} got {} bytes from {lastest_url}", s.len());
+                    trace!(
+                        "{worker_name} {source} got {} bytes from {lastest_url}",
+                        s.len()
+                    );
                     let today = chrono::Local::now().date_naive();
                     let s_today = today.format("%Y%m").to_string();
                     let re = Regex::new(&format!(r"https://.+?\.mibei77\.com/{}.+?\.txt", s_today))
                         .unwrap();
                     match re.find(&s) {
                         Some(x) => {
-                            ret = Some((String::from(url), vec![String::from(x.as_str())]));
-                            trace!("{worker_name} got mibei url {ret:?}");
+                            urls = vec![String::from(x.as_str())];
+                            trace!("{worker_name} {source} got mibei url {urls:?}");
                         }
                         None => {
-                            warn!("{worker_name} can't found mibei url");
+                            warn!("{worker_name} {source} can't found mibei url");
                         }
                     };
                 } else {
-                    warn!("{worker_name} can't get content from {lastest_url} !!!");
+                    warn!("{worker_name} {source} can't get content from {lastest_url} !!!");
                 }
             }
             Err(e) => {
-                warn!("{worker_name} can't get content from {lastest_url}, err: {e} !!!");
+                warn!("{worker_name} {source} can't get content from {lastest_url}, err: {e} !!!");
             }
         }
     }
 
-    ret
+    Some((String::from(source), urls))
 }
 
 pub async fn get_tolinkshare_data(worker_name: &str) -> Option<(String, String)> {
