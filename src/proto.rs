@@ -24,7 +24,7 @@ pub async fn data2node_one(
     worker_name: &String,
     s: &str,
     url: &String,
-    node_out: &Sender<Node>,
+    node_tx: &Sender<Node>,
 ) -> () {
     let mut l_data: Vec<String>;
     if let Some(raw_s) = b64d(s, url, true).await {
@@ -143,7 +143,7 @@ pub async fn data2node_one(
                 }
 
                 // trace!("{} proto {} uuid {}, ip {}, port {}, alias {:?}", worker_name, proto, uuid, add, port, alias);
-                if let Err(e) = node_out
+                if let Err(e) = node_tx
                     .send(Node {
                         proto: proto.to_string(),
                         param: x,
@@ -203,7 +203,7 @@ pub async fn data2node_one(
                 alias = tools::adjust_alias(alias);
                 // trace!("{} proto {} uuid {}, ip {}, port {}, alias {:?} param: {:?}", worker_name, proto, uuid, ip, port, alias, param);
 
-                if let Err(e) = node_out
+                if let Err(e) = node_tx
                     .send(Node {
                         proto: proto.to_string(),
                         uuid,
@@ -238,7 +238,7 @@ pub async fn data2node_one(
                 param.insert(String::from("password"), password.to_string());
                 let mut alias = unquote_plus(p.fragment().unwrap_or_default()).unwrap_or_default();
                 alias = tools::adjust_alias(alias);
-                if let Err(e) = node_out
+                if let Err(e) = node_tx
                     .send(Node {
                         proto: proto.to_string(),
                         uuid: String::new(),
@@ -317,7 +317,7 @@ pub async fn data2node_one(
                         unquote_plus(p.fragment().unwrap_or_default()).unwrap_or_default();
                     alias = tools::adjust_alias(alias);
                     // debug!("{} add ss node ip {} port {}, param {:?} alias {}", worker_name, ip, port, param, alias);
-                    if let Err(e) = node_out
+                    if let Err(e) = node_tx
                         .send(Node {
                             proto: proto.to_string(),
                             uuid: String::new(),
@@ -367,7 +367,7 @@ pub async fn data2node_one(
                     param.insert(String::from("password"), _password);
 
                     // debug!("{} add ss node ip {} port {}, param {:?} alias {},", worker_name, ip, port, param, alias);
-                    if let Err(e) = node_out
+                    if let Err(e) = node_tx
                         .send(Node {
                             proto: proto.to_string(),
                             uuid: String::new(),
@@ -401,25 +401,27 @@ pub async fn data2node_one(
 
         if nr % 10 == 0 {
             // 降速，给别的协程执行机会
-            time::sleep(Duration::from_millis(100)).await;
+            time::sleep(Duration::from_millis(20)).await;
         }
 
-        if nr >= 50 {
-            debug!("{worker_name} each source only process head {nr}, break !!!");
+        // debugonly
+        if nr >= 1000 {
+            debug!("{worker_name} each source only process head {nr}, break !!! {url}");
             break;
         }
     }
 }
 
-pub async fn parse_yaml(
-    worker_name: &String,
-    s: &str,
-    url: &String,
-    node_out: &Sender<Node>,
-) -> () {
+pub async fn parse_yaml(worker_name: &String, s: &str, url: &String, node_tx: &Sender<Node>) -> () {
     // trace!("{} processing yaml data from {}", worker_name, url);
     // let yaml_data: Yamlv = serde_yaml::from_str(s).unwrap_or_default();
-    let yaml_data: HashMap<String, Yamlv> = serde_yaml::from_str(s).unwrap_or_default();
+    let mut yaml_data: HashMap<String, Yamlv> = serde_yaml::from_str(s).unwrap_or_default();
+    // 尝试b64解码后再解析
+    if !yaml_data.contains_key("proxies") {
+        if let Some(raw_s) = b64d(s, url, false).await {
+            yaml_data = serde_yaml::from_str(raw_s.as_str()).unwrap_or_default();
+        }
+    }
     if yaml_data.contains_key("proxies") {
         let l_proxy: Vec<Yamlv> = match yaml_data.get("proxies") {
             Some(Yamlv::Sequence(seq)) => seq.clone(),
@@ -557,7 +559,7 @@ pub async fn parse_yaml(
             });
             alias = tools::adjust_alias(alias);
 
-            if let Err(e) = node_out
+            if let Err(e) = node_tx
                 .send(Node {
                     proto: String::from(
                         _param
@@ -586,12 +588,12 @@ pub async fn parse_yaml(
 
             if nr % 10 == 0 {
                 // 降速，给别的协程执行机会
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(20)).await;
             }
 
             // debugonly
-            if nr >= 50 {
-                debug!("{worker_name} each source only process head {nr}, break !!!");
+            if nr >= 1000 {
+                debug!("{worker_name} each source only process head {nr}, break !!! {url}");
                 break;
             }
         }

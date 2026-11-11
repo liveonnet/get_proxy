@@ -22,6 +22,7 @@ use tokio::signal;
 
 use async_channel::{bounded, Receiver, Sender};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
 use std::error;
@@ -332,15 +333,15 @@ async fn do_all(
     pick_one: bool,
 ) -> MyResult<String> {
     let b_stop_process = Arc::new(RwLock::new(false));
-    let (url_tx, url_rx) = bounded(10);
-    let (data_tx, data_rx) = bounded(10);
-    let (node_tx, node_rx) = bounded(300); // todo: 调整容量
-    let (ip_tx, ip_rx) = bounded(100);
-    let (area_tx, area_rx) = bounded(50);
-    let (uniq_tx, uniq_rx) = bounded(50); // todo: 调整容量
-    let (good_tx, good_rx) = async_priority_channel::bounded::<Node, u32>(50); // todo: 调整容量
+    let (url_tx, url_rx) = bounded(15);
+    let (data_tx, data_rx) = bounded(30);
+    let (node_tx, node_rx) = bounded(1000); // todo: 调整容量
+    let (ip_tx, ip_rx) = bounded(1000);
+    let (area_tx, area_rx) = bounded(300);
+    let (uniq_tx, uniq_rx) = bounded(300); // todo: 调整容量
+    let (good_tx, good_rx) = async_priority_channel::bounded::<Node, u32>(100); // todo: 调整容量
     let max_candidate: u64 = conf["candidate_max"].as_u64().unwrap();
-    let (candidate_out, candidate_in) = async_priority_channel::bounded::<Node, u32>(max_candidate);
+    let (candidate_tx, candidate_rx) = async_priority_channel::bounded::<Node, u32>(max_candidate);
     let e_clear = Arc::new(Notify::new());
 
     let e_candidate_change = Arc::new(Notify::new());
@@ -354,7 +355,7 @@ async fn do_all(
         node_rx.clone(),
         uniq_rx.clone(),
         good_rx.clone(),
-        candidate_in.clone(),
+        candidate_rx.clone(),
         e_candidate_change.clone(),
         e_clear.clone(),
         e_exit.clone(),
@@ -443,7 +444,7 @@ async fn do_all(
     ));
     tokio::spawn(measure_node(
         good_rx.clone(),
-        candidate_out.clone(),
+        candidate_tx.clone(),
         e_candidate_change.clone(),
         e_exit.clone(),
         conf.clone(),
@@ -452,7 +453,7 @@ async fn do_all(
 
     service(
         conf.clone(),
-        candidate_in.clone(),
+        candidate_rx.clone(),
         e_candidate_change.clone(),
         e_ip_changed.clone(),
         e_exit.clone(),
@@ -570,7 +571,7 @@ async fn node2ip(
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
-    let worker_name = format!("[n2ip-{idx}]");
+    let worker_name = format!("[n2ip-{idx:02}]");
     let mut exit_flag = false;
     let l_nameserver = vec![
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53),
@@ -585,17 +586,18 @@ async fn node2ip(
     let mut show_time = SystemTime::now();
     let mut delta;
     while !exit_flag {
-        if SystemTime::now()
+        let now_interval = SystemTime::now()
             .duration_since(show_time)
             .unwrap_or_default()
-            .as_secs()
-            >= 60
-        {
-            show_time = SystemTime::now();
+            .as_secs();
+        if now_interval >= 60 {
             debug!(
-                "{worker_name} queried: {nr_processed}@{:.1}/s, skipped: {nr_skipped}",
+                "{worker_name} {}s {} = {nr_processed}@{:.1}/s + {nr_skipped}",
+                now_interval,
+                nr_processed + nr_skipped,
                 nr_processed as f64 / (nr_millsec as f64 / 1000_f64)
             );
+            show_time = SystemTime::now();
             nr_processed = 0;
             nr_skipped = 0;
             nr_millsec = 0;
@@ -657,7 +659,7 @@ async fn ip2area(
 ) -> () {
     let worker_name = format!("[i2a-{idx}]");
     let mut exit_flag = false;
-    let p_area = Regex::new("日本|美国|新加坡|台湾|澳大利亚|韩国|德国|加拿大").unwrap();
+    let p_area = Regex::new("日本|美国|新加坡|台湾|澳大利亚|韩国|德国|加拿大|英国|法国|意大利|比利时|捷克|瑞典|芬兰|挪威|俄罗斯").unwrap();
     let mut wry = qqwry::QQWry::from(conf["qqwry_path"].as_str().unwrap_or_default().to_string());
     while !exit_flag {
         tokio::select! {
@@ -857,6 +859,7 @@ async fn measure_node(
     }
 
     let mut exit_flag = false;
+    let hm_rate: Arc<Mutex<HashMap<String, u32>>> = Arc::new(Mutex::new(HashMap::new()));
     while !exit_flag {
         tokio::select! {
             _ = e_exit.notified() =>{
@@ -867,7 +870,7 @@ async fn measure_node(
                 {
                     let b_stop = b_stop_process.read().await;
                     if *b_stop {
-                        trace!("{worker_name} b_stop, not process good_in");
+                        trace!("{worker_name} b_stop, not process good_rx");
                         continue;
                     }
                 }
@@ -882,12 +885,13 @@ async fn measure_node(
                     }
                 };
                 let cur_port_tx = port_tx.clone();
-                let cur_good_in = good_rx.clone();
+                let cur_good_rx = good_rx.clone();
                 let cur_e_candidate_change = e_candidate_change.clone();
                 let cur_headers = headers.clone();
                 let cur_worker_name = format!("{}-{}", worker_name, cur_port);
                 let cur_b_stop = b_stop_process.clone();
                 let cur_e_exit = e_exit.clone();
+                let cur_hm_rate = Arc::clone(&hm_rate);
                 tokio::spawn(async move{
                     let (mut child, file_path) = match launcher::launcher_proxy(cur_worker_name.as_str(), &_node, &cur_conf, cur_port, true).await{
                         Some((a,b))=>{(a,b)},
@@ -911,7 +915,7 @@ async fn measure_node(
                     let client = reqwest::Client::builder()
                         .proxy(reqwest::Proxy::all(cur_proxy).unwrap())
                         .default_headers(cur_headers)
-                        .connect_timeout(Duration::from_millis((speed_limit as f64 * 0.5).round() as u64))
+                        .connect_timeout(Duration::from_millis((speed_limit as f64 * 0.8).round() as u64))
                         .timeout(Duration::from_millis((speed_limit as f64 * 0.8).round() as u64))
                         .build().unwrap_or_else(|e|{error!("client create failed! {e}"); reqwest::Client::builder().build().unwrap()});
 
@@ -929,6 +933,19 @@ async fn measure_node(
                     if !b_stop_put && nr_succ >= min_succ{
                         if min_latency < speed_limit{
                             info!("~~~~~~~~~~~~~~~~ {cur_worker_name} succ {min_latency}ms {} {_node} ~~~~~~~~~~~~~~~", _node.area);
+                            let mut sort_items: Vec<(String, u32)>;
+                            {
+                                // 对应的数据来源评分+1
+                                let mut hm_guard = cur_hm_rate.lock().unwrap();
+                                *hm_guard.entry(_node.source.clone()).or_insert(0) += 1;
+                                sort_items = hm_guard.clone().into_iter().collect();
+                            }
+                            // 输出当前评分情况
+                            sort_items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                            for (url, rate) in sort_items.iter() {
+                                info!("{worker_name} {} {}", rate, url);
+                            }
+
                             if let Err(e) = tx.send(_node, 999999u32 - min_latency).await {
                                 debug!("{cur_worker_name} putting data got {e}");
                             }else{
@@ -938,7 +955,7 @@ async fn measure_node(
                                     info!("{worker_name} candidate queue is full, stop processing.");
                                     let mut b = cur_b_stop.write().await;
                                     *b = true;
-                                    while cur_good_in.try_recv().is_ok(){};
+                                    while cur_good_rx.try_recv().is_ok(){};
                                 }
                             };
                         }else{
@@ -968,6 +985,19 @@ async fn measure_node(
                     let _ = cur_port_tx.send(cur_port).await;
                 });   // end of closure
             }
+        }
+    }
+
+    let mut sort_items: Vec<(String, u32)>;
+    {
+        let hm_guard = hm_rate.lock().unwrap();
+        sort_items = hm_guard.clone().into_iter().collect();
+    }
+    if !sort_items.is_empty() {
+        info!("{worker_name} url rate: ");
+        sort_items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        for (url, rate) in sort_items.iter() {
+            info!("{worker_name} {} {}", rate, url);
         }
     }
 
@@ -1229,8 +1259,8 @@ async fn dispatch(
         .unwrap_or(UNIX_EPOCH);
     let mut exit_flag = false;
     let mut pick_index: usize = usize::MAX;
-    let mut st_recent: HashSet<String> = HashSet::new(); // 记录近期放入过url_in队列的数据源
-    let mut nr_recent = 0; // 每次批量入url_in队列时递增，用于判断何时清空st_recent
+    let mut st_recent: HashSet<String> = HashSet::new(); // 记录近期放入过url_rx队列的数据源
+    let mut nr_recent = 0; // 每次批量入url_rx队列时递增，用于判断何时清空st_recent
     while !exit_flag {
         print!(".");
         let _ = io::stdout().flush();
@@ -1239,7 +1269,7 @@ async fn dispatch(
             .duration_since(time_add)
             .unwrap_or_default()
             .as_secs()
-            < 90;
+            < 180;
         let remain = candidate_rx.len();
         if remain <= min_candidate && !recent_put {
             info!("{worker_name} TMPDBG {remain}<={min_candidate} && not recent put");
@@ -1445,6 +1475,7 @@ async fn dispatch(
                             });
                         }
                     }
+                    info!("{worker_name} TMPDBG all githubreadme url(s) added.");
                 }
 
                 while let Some(rslt) = st.join_next().await {
@@ -1460,7 +1491,6 @@ async fn dispatch(
                         }
                     }
                 }
-                info!("{worker_name} TMPDBG all githubreadme url(s) added.");
 
                 // 打乱顺序
                 if !pick_one {
@@ -1478,12 +1508,12 @@ async fn dispatch(
                     && st_recent.insert(String::from("tolinkshare"))
                     && st_recent.insert(String::from("vpnnet"))
                 {
-                    let data_out_c = data_tx.clone();
+                    let data_tx_c = data_tx.clone();
                     tokio::spawn(async move {
                         let _d1 = proto::get_tolinkshare_data("test").await;
                         let _d2 = proto::get_vpnnet_data("test").await;
                         for _x in [_d1, _d2].into_iter().flatten() {
-                            if let Err(e) = data_out_c.send(_x).await {
+                            if let Err(e) = data_tx_c.send(_x).await {
                                 error!("{worker_name} put data failed!!! {e}");
                             }
                         }
@@ -1494,11 +1524,11 @@ async fn dispatch(
                             .unwrap_or_default();
                         if !l_node.is_empty() {
                             for node in l_node {
-                                if let Err(e) = data_out_c.send(node).await {
+                                if let Err(e) = data_tx_c.send(node).await {
                                     error!("{worker_name} put data failed!!! {e}");
                                 }
                             }
-                            debug!("{worker_name} sharkdoor data added to data_out.");
+                            debug!("{worker_name} sharkdoor data added to data_tx.");
                         }
                     });
 
@@ -1511,7 +1541,7 @@ async fn dispatch(
                     }
                 }
 
-                info!("{worker_name} TMPDBG regular urls len {}", urls.len());
+                // info!("{worker_name} TMPDBG regular urls len {}", urls.len());
                 if pick_one && pick_index == usize::MAX {
                     for (_i, _url) in urls.iter().enumerate() {
                         println!("{_i}: {_url}");
@@ -1548,12 +1578,12 @@ async fn dispatch(
                         error!("{worker_name} put url failed!!! {e}");
                     }
                 } else {
-                    if nr_recent >= 4 {
+                    if nr_recent > 5 {
                         st_recent.clear();
                         debug!("{worker_name} st_recent cleared");
                         nr_recent = 0;
                     }
-                    info!("{worker_name} sending {} urls to url_out ...", urls.len());
+                    info!("{worker_name} sending {} urls to url_tx ...", urls.len());
                     for (idx, url) in urls.into_iter().enumerate() {
                         if st_recent.insert(url.clone()) {
                             // 最近没有处理过的才处理，避免短期内处理重复数据源
@@ -1615,7 +1645,7 @@ async fn dispatch(
                     }
                 }
             } else {
-                // info!("{worker_name} candidate now {}", candidate_in.len());
+                // info!("{worker_name} candidate now {}", candidate_rx.len());
                 print!("_{}_", candidate_rx.len());
                 let _ = io::stdout().flush();
             }
