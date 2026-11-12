@@ -406,7 +406,10 @@ pub async fn data2node_one(
 
         // debugonly
         if nr >= 1000 {
-            debug!("{worker_name} each source only process head {nr}, break !!! {url}");
+            debug!(
+                "{worker_name} each source only process head {nr}/{}, break !!! {url}",
+                l_data.len()
+            );
             break;
         }
     }

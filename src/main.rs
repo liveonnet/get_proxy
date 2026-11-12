@@ -571,7 +571,7 @@ async fn node2ip(
     e_exit: Arc<Notify>,
     b_stop: Arc<RwLock<bool>>,
 ) -> () {
-    let worker_name = format!("[n2ip-{idx:02}]");
+    let worker_name = format!("[n2i-{idx:02}]");
     let mut exit_flag = false;
     let l_nameserver = vec![
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53),
@@ -933,17 +933,27 @@ async fn measure_node(
                     if !b_stop_put && nr_succ >= min_succ{
                         if min_latency < speed_limit{
                             info!("~~~~~~~~~~~~~~~~ {cur_worker_name} succ {min_latency}ms {} {_node} ~~~~~~~~~~~~~~~", _node.area);
+
+                            // 评分部分
                             let mut sort_items: Vec<(String, u32)>;
+                            // 跳过代理部分只取实际的url
+                            let _l_pos: Vec<_> = _node.source.match_indices("https://").collect();
+                            let _source = if _l_pos.len() > 1 {
+                                String::from(_node.source.get(_l_pos[1].0..).unwrap())
+                            } else {
+                                _node.source.clone()
+                            };
+                            debug!("{worker_name} rate source {_source}");
                             {
                                 // 对应的数据来源评分+1
                                 let mut hm_guard = cur_hm_rate.lock().unwrap();
-                                *hm_guard.entry(_node.source.clone()).or_insert(0) += 1;
+                                *hm_guard.entry(_source).or_insert(0) += 1;
                                 sort_items = hm_guard.clone().into_iter().collect();
                             }
                             // 输出当前评分情况
                             sort_items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
                             for (url, rate) in sort_items.iter() {
-                                info!("{worker_name} {} {}", rate, url);
+                                info!("{worker_name} rate: {} {}", rate, url);
                             }
 
                             if let Err(e) = tx.send(_node, 999999u32 - min_latency).await {
@@ -994,10 +1004,9 @@ async fn measure_node(
         sort_items = hm_guard.clone().into_iter().collect();
     }
     if !sort_items.is_empty() {
-        info!("{worker_name} url rate: ");
         sort_items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         for (url, rate) in sort_items.iter() {
-            info!("{worker_name} {} {}", rate, url);
+            info!("{worker_name} rate: {} {}", rate, url);
         }
     }
 
