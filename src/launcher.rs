@@ -130,12 +130,14 @@ pub async fn launcher_proxy(
             .arg("-config")
             .arg(filepath.as_path().to_str().unwrap_or_default())
             .creation_flags(CREATE_NEW_PROCESS_GROUP)
+            .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null());
 
         #[cfg(unix)]
         let cmd_x = cmd
             .arg("run")
+            .kill_on_drop(true)
             .process_group(0)
             .arg("-config")
             .arg(filepath.as_path().to_str().unwrap_or_default().to_string())

@@ -10,6 +10,7 @@ use serde_json::json;
 use serde_json::Value;
 use serde_yaml::Value as Yamlv;
 use std::collections::HashMap;
+use tokio_util::sync::CancellationToken;
 // use std::fmt::Debug;
 // use std::fmt::Pointer;
 use std::time::Duration;
@@ -24,6 +25,7 @@ pub async fn data2node_one(
     worker_name: &String,
     s: &str,
     url: &String,
+    e_exit: &CancellationToken,
     node_tx: &Sender<Node>,
 ) -> () {
     let mut l_data: Vec<String>;
@@ -55,6 +57,7 @@ pub async fn data2node_one(
 
     let mut nr = 0;
     let mut p: Url;
+    let mut node: Option<Node> = None;
     let re = Regex::new(":|@").unwrap();
     let re_chinese = Regex::new(r"\p{Han}").unwrap();
     for mut _data in l_data.iter_mut() {
@@ -143,25 +146,19 @@ pub async fn data2node_one(
                 }
 
                 // trace!("{} proto {} uuid {}, ip {}, port {}, alias {:?}", worker_name, proto, uuid, add, port, alias);
-                if let Err(e) = node_tx
-                    .send(Node {
-                        proto: proto.to_string(),
-                        param: x,
-                        uuid,
-                        ip: add,
-                        port,
-                        alias,
-                        source: String::from(url),
-                        real_ip: String::new(),
-                        area: String::new(),
-                        score: 0,
-                        score_unit: String::from("ms"),
-                        raw: _data.clone(),
-                    })
-                    .await
-                {
-                    debug!("{worker_name} putting data got error!!! {e}");
-                };
+                node = Some(Node {
+                    proto: proto.to_string(),
+                    param: x,
+                    uuid,
+                    ip: add,
+                    port,
+                    alias,
+                    source: String::from(url),
+                    real_ip: String::new(),
+                    area: String::new(),
+                    score: 0,
+                    raw: _data.clone(),
+                });
             }
             "vless" => {
                 // <uuid>@<ip>:<port>?encryption=<>&security=<>&sni=<>&type=<>&host=<>&path=<>#<alias>
@@ -202,26 +199,19 @@ pub async fn data2node_one(
                     unquote_plus(p.fragment().unwrap_or_default()).unwrap_or_default();
                 alias = tools::adjust_alias(alias);
                 // trace!("{} proto {} uuid {}, ip {}, port {}, alias {:?} param: {:?}", worker_name, proto, uuid, ip, port, alias, param);
-
-                if let Err(e) = node_tx
-                    .send(Node {
-                        proto: proto.to_string(),
-                        uuid,
-                        ip,
-                        port,
-                        param: serde_json::to_value(param).unwrap_or_default(),
-                        alias,
-                        real_ip: String::new(),
-                        area: String::new(),
-                        score: 0,
-                        score_unit: String::from("ms"),
-                        source: url.to_string(),
-                        raw: _data.clone(),
-                    })
-                    .await
-                {
-                    debug!("{worker_name} putting data got error!!! {e}");
-                };
+                node = Some(Node {
+                    proto: proto.to_string(),
+                    uuid,
+                    ip,
+                    port,
+                    param: serde_json::to_value(param).unwrap_or_default(),
+                    alias,
+                    real_ip: String::new(),
+                    area: String::new(),
+                    score: 0,
+                    source: url.to_string(),
+                    raw: _data.clone(),
+                });
             }
             "trojan" => {
                 // <password>@<ip>:<port>?security=<>&sni=<>&type=<>&headerType=<>#<alias>
@@ -238,25 +228,19 @@ pub async fn data2node_one(
                 param.insert(String::from("password"), password.to_string());
                 let mut alias = unquote_plus(p.fragment().unwrap_or_default()).unwrap_or_default();
                 alias = tools::adjust_alias(alias);
-                if let Err(e) = node_tx
-                    .send(Node {
-                        proto: proto.to_string(),
-                        uuid: String::new(),
-                        ip,
-                        port,
-                        param: serde_json::to_value(param).unwrap_or_default(),
-                        alias,
-                        real_ip: String::new(),
-                        area: String::new(),
-                        score: 0,
-                        score_unit: String::from("ms"),
-                        source: url.to_string(),
-                        raw: _data.clone(),
-                    })
-                    .await
-                {
-                    debug!("{worker_name} putting data got error!!! {e}");
-                };
+                node = Some(Node {
+                    proto: proto.to_string(),
+                    uuid: String::new(),
+                    ip,
+                    port,
+                    param: serde_json::to_value(param).unwrap_or_default(),
+                    alias,
+                    real_ip: String::new(),
+                    area: String::new(),
+                    score: 0,
+                    source: url.to_string(),
+                    raw: _data.clone(),
+                });
             }
             "ss" => {
                 // base64(<method>:<password>)@<ip>:<port>#<alias>
@@ -317,25 +301,19 @@ pub async fn data2node_one(
                         unquote_plus(p.fragment().unwrap_or_default()).unwrap_or_default();
                     alias = tools::adjust_alias(alias);
                     // debug!("{} add ss node ip {} port {}, param {:?} alias {}", worker_name, ip, port, param, alias);
-                    if let Err(e) = node_tx
-                        .send(Node {
-                            proto: proto.to_string(),
-                            uuid: String::new(),
-                            ip: ip.to_string(),
-                            port,
-                            param: serde_json::to_value(param).unwrap_or_default(),
-                            alias,
-                            real_ip: String::new(),
-                            area: String::new(),
-                            score: 0,
-                            score_unit: String::from("ms"),
-                            source: url.to_string(),
-                            raw: _data.clone(),
-                        })
-                        .await
-                    {
-                        debug!("{worker_name} putting data got error!!! {e}");
-                    };
+                    node = Some(Node {
+                        proto: proto.to_string(),
+                        uuid: String::new(),
+                        ip: ip.to_string(),
+                        port,
+                        param: serde_json::to_value(param).unwrap_or_default(),
+                        alias,
+                        real_ip: String::new(),
+                        area: String::new(),
+                        score: 0,
+                        source: url.to_string(),
+                        raw: _data.clone(),
+                    });
                 } else {
                     let _tmp: Vec<&str> = re.splitn(s.as_str(), 4).collect();
                     if _tmp.len() != 4 {
@@ -367,25 +345,19 @@ pub async fn data2node_one(
                     param.insert(String::from("password"), _password);
 
                     // debug!("{} add ss node ip {} port {}, param {:?} alias {},", worker_name, ip, port, param, alias);
-                    if let Err(e) = node_tx
-                        .send(Node {
-                            proto: proto.to_string(),
-                            uuid: String::new(),
-                            ip,
-                            port,
-                            param: serde_json::to_value(param).unwrap_or_default(),
-                            alias,
-                            real_ip: String::new(),
-                            area: String::new(),
-                            score: 0,
-                            score_unit: String::from("ms"),
-                            source: url.to_string(),
-                            raw: _data.clone(),
-                        })
-                        .await
-                    {
-                        debug!("{worker_name} putting data got error!!! {e}");
-                    };
+                    node = Some(Node {
+                        proto: proto.to_string(),
+                        uuid: String::new(),
+                        ip,
+                        port,
+                        param: serde_json::to_value(param).unwrap_or_default(),
+                        alias,
+                        real_ip: String::new(),
+                        area: String::new(),
+                        score: 0,
+                        source: url.to_string(),
+                        raw: _data.clone(),
+                    });
                 }
             }
             "hysteria" | "hysteria2" | "hy2" | "ssr" | "tuic" | "http" | "https" | "socks"
@@ -397,6 +369,21 @@ pub async fn data2node_one(
             }
         }
 
+        // 统一在此处入队列
+        if let Some(_node) = node {
+            tokio::select! {
+                _ = e_exit.cancelled() => {
+                    debug!("{worker_name} got exit flag while putting node");
+                    return;
+                },
+                rslt = node_tx.send(_node.clone()) => {
+                    if let Err(e) = rslt {
+                        debug!("{worker_name} putting data got error!!! {e}");
+                    };
+                }
+            }
+            node = None;
+        }
         nr += 1;
 
         if nr % 10 == 0 {
@@ -415,7 +402,13 @@ pub async fn data2node_one(
     }
 }
 
-pub async fn parse_yaml(worker_name: &String, s: &str, url: &String, node_tx: &Sender<Node>) -> () {
+pub async fn parse_yaml(
+    worker_name: &String,
+    s: &str,
+    url: &String,
+    e_exit: &CancellationToken,
+    node_tx: &Sender<Node>,
+) -> () {
     // trace!("{} processing yaml data from {}", worker_name, url);
     // let yaml_data: Yamlv = serde_yaml::from_str(s).unwrap_or_default();
     let mut yaml_data: HashMap<String, Yamlv> = serde_yaml::from_str(s).unwrap_or_default();
@@ -562,7 +555,12 @@ pub async fn parse_yaml(worker_name: &String, s: &str, url: &String, node_tx: &S
             });
             alias = tools::adjust_alias(alias);
 
-            if let Err(e) = node_tx
+            tokio::select! {
+                _ = e_exit.cancelled() => {
+                    debug!("{worker_name} got exit flag while putting node");
+                    return;
+                },
+                rslt = node_tx
                 .send(Node {
                     proto: String::from(
                         _param
@@ -579,14 +577,14 @@ pub async fn parse_yaml(worker_name: &String, s: &str, url: &String, node_tx: &S
                     real_ip: String::new(),
                     area: String::new(),
                     score: 0,
-                    score_unit: String::from("ms"),
                     source: url.to_string(),
                     raw: serde_yaml::to_string(&_proxy).unwrap_or_default(),
-                })
-                .await
-            {
-                debug!("{worker_name} putting got error!!! {e}");
-            };
+                }) => {
+                    if let Err(e) = rslt            {
+                        debug!("{worker_name} putting got error!!! {e}");
+                    };
+                }
+            }
             nr += 1;
 
             if nr % 10 == 0 {

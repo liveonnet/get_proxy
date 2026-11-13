@@ -8,7 +8,7 @@ use std::str::FromStr;
 use urlparse::unquote_plus;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Node {
     pub proto: String,
     pub uuid: String,
@@ -20,7 +20,6 @@ pub struct Node {
     pub real_ip: String,
     pub area: String,
     pub score: u32,
-    pub score_unit: String,
     pub source: String,
     pub raw: String,
 }
@@ -37,10 +36,24 @@ impl Node {
             real_ip: String::new(),
             area: String::new(),
             score: 0,
-            score_unit: String::from("ms"),
             source: String::new(),
             raw: String::new(),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn clear(&mut self) {
+        self.proto.clear();
+        self.uuid.clear();
+        self.ip.clear();
+        self.port = 0;
+        self.param = Value::Null;
+        self.alias.clear();
+        self.real_ip.clear();
+        self.area.clear();
+        self.score = 0;
+        self.source.clear();
+        self.raw.clear();
     }
 
     // pub fn is_empty(&self) -> bool{

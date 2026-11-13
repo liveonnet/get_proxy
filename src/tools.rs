@@ -1,6 +1,9 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use log::{debug, error, trace, warn};
+use chromiumoxide::cdp::browser_protocol::page::{
+    CaptureScreenshotFormat, CaptureScreenshotParams, Viewport,
+};
+use log::{debug, error, info, trace, warn};
 use reqwest::Client;
 use serde_json::map::Entry;
 use serde_json::Value;
@@ -12,20 +15,19 @@ use std::net::UdpSocket;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 #[allow(unused_imports)]
 use tokio::process::Command;
-use tokio::sync::Notify;
 use tokio::time::timeout;
+use tokio_util::sync::CancellationToken;
 // #[allow(unused_imports)]
 // use toml::Value as tvalue;
 use crate::node::Node;
 // use chromiumoxide::browser;
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use futures::StreamExt;
-
 use regex::Regex;
+use std::collections::HashMap;
 
 #[allow(unused_macros)]
 macro_rules! assert_types {
@@ -178,74 +180,82 @@ pub async fn check_proxy(
     max_retry: u32,
     min_succ: u32,
     show_fail: bool,
-    e_exit: Arc<Notify>,
+    e_exit: CancellationToken,
 ) -> (u32, u32) {
     let mut nr_succ = 0;
     let mut min_latency = 999999u128;
     for _nr in 1..=max_retry {
         let req = client.head(url).build().unwrap();
         let start = SystemTime::now();
-        match client.execute(req).await {
-            Ok(_) => {
-                let latency = SystemTime::now()
-                    .duration_since(start)
-                    .unwrap_or_default()
-                    .as_millis();
-                if latency < min_latency {
-                    min_latency = latency;
-                }
-                nr_succ += 1;
-                if nr_succ >= min_succ {
-                    // 已达标
-                    break;
-                } else if nr_succ + (max_retry - _nr) < min_succ {
-                    // 即使后面都成功也达不到min_succ则退出
-                    break;
-                }
-            }
-            Err(e) => {
-                if show_fail {
-                    warn!("{worker_name} failed {node} {e}");
-                }
-
-                // 提前退出的情况：被主动拒绝10061，tls握手出错，解码出错；这几种情况再试也不会成功
-                if e.is_connect() && e.is_request() {
-                    if let Some(x) = e.source() {
-                        if let Some(xx) = x.source() {
-                            // warn!("{worker_name} request got sourc.source {}", xx);
-                            if let Some(xxx) = xx.source() {
-                                // warn!("{worker_name} request got source.source.source {}", xxx);
-                                if xxx.to_string().contains("10061") {
-                                    // warn!("{worker_name} request got {xxx}");
-                                    trace!("{worker_name} q failed {node} {xxx}");
-                                    break;
-                                }
-                            }
-                            if xx.to_string().contains("tls handshake eof") {
-                                // warn!("{worker_name} request got {xx}");
-                                trace!("{worker_name} q failed {node} {xx}");
-                                break;
-                            }
+        tokio::select! {
+            _ = e_exit.cancelled() => {
+                info!("{worker_name} got exit flag while checking proxy!");
+                return (0, 999999u32);
+            },
+            rslt = client.execute(req) => {
+                match rslt {
+                    Ok(_) => {
+                        let latency = SystemTime::now()
+                            .duration_since(start)
+                            .unwrap_or_default()
+                            .as_millis();
+                        if latency < min_latency {
+                            min_latency = latency;
+                        }
+                        nr_succ += 1;
+                        if nr_succ >= min_succ {
+                            // 已达标
+                            break;
+                        } else if nr_succ + (max_retry - _nr) < min_succ {
+                            // 即使后面都成功也达不到min_succ则退出
+                            break;
                         }
                     }
-                } else if e.is_decode() {
-                    trace!("{worker_name} q failed {node} {e}");
-                    break;
-                }
+                    Err(e) => {
+                        if show_fail {
+                            warn!("{worker_name} failed {node} {e}");
+                        }
 
-                if nr_succ + (max_retry - _nr) < min_succ {
-                    trace!("{worker_name} failed {node} {e}");
-                    break;
-                }
-                if timeout(Duration::from_millis(100), e_exit.notified())
-                    .await
-                    .is_ok()
-                {
-                    debug!("{worker_name} got exit flag");
-                    break;
+                        // 提前退出的情况：被主动拒绝10061，tls握手出错，解码出错；这几种情况再试也不会成功
+                        if e.is_connect() && e.is_request() {
+                            if let Some(x) = e.source() {
+                                if let Some(xx) = x.source() {
+                                    // warn!("{worker_name} request got sourc.source {}", xx);
+                                    if let Some(xxx) = xx.source() {
+                                        // warn!("{worker_name} request got source.source.source {}", xxx);
+                                        if xxx.to_string().contains("10061") {
+                                            // warn!("{worker_name} request got {xxx}");
+                                            trace!("{worker_name} q failed {node} {xxx}");
+                                            break;
+                                        }
+                                    }
+                                    if xx.to_string().contains("tls handshake eof") {
+                                        // warn!("{worker_name} request got {xx}");
+                                        trace!("{worker_name} q failed {node} {xx}");
+                                        break;
+                                    }
+                                }
+                            }
+                        } else if e.is_decode() {
+                            trace!("{worker_name} q failed {node} {e}");
+                            break;
+                        }
+
+                        if nr_succ + (max_retry - _nr) < min_succ {
+                            trace!("{worker_name} failed {node} {e}");
+                            break;
+                        }
+                        if timeout(Duration::from_millis(100), e_exit.cancelled())
+                            .await
+                            .is_ok()
+                        {
+                            debug!("{worker_name} got exit flag");
+                            break;
+                        }
+                    }
                 }
             }
-        };
+        }
     }
 
     // if min_latency != 999999{
@@ -319,6 +329,7 @@ pub async fn fetch_dynamic_page(
     }
 
     config_builder = config_builder.request_timeout(request_timeout);
+    config_builder = config_builder.arg("--blink-settings=imagesEnabled=false"); // 不加载图片
 
     let config = config_builder.build()?;
 
@@ -330,8 +341,9 @@ pub async fn fetch_dynamic_page(
 
     // 4. 在后台任务中处理浏览器事件流
     let browser_handle = tokio::spawn(async move {
-        while let Some(h) = handler.next().await {
-            if h.is_err() {
+        while let Some(event) = handler.next().await {
+            if event.is_err() {
+                warn!("browser handler error: {:?}", event.err());
                 break;
             }
         }
@@ -339,9 +351,40 @@ pub async fn fetch_dynamic_page(
 
     // 5. 创建新页面
     let page = browser.new_page(url).await?;
-    // trace!("browser open new page {url} done.");
+    page.wait_for_navigation().await?;
+    if let Ok(Some(title)) = page.get_title().await {
+        debug!("page loaded succ. title: {title} url: {url}");
+    }
     let html = page.content().await?;
-    // trace!("browser got {} bytes from page {url}.", html.len());
+    trace!("browser got {} bytes from page {url}.", html.len());
+
+    if false {
+        // 屏幕截图，未处理懒加载和基于滚动的动态加载
+        let width: f64 = page
+            .evaluate("document.documentElement.scrollWidth")
+            .await?
+            .into_value()?;
+        let height: f64 = page
+            .evaluate("document.documentElement.scrollHeight")
+            .await?
+            .into_value()?;
+        let _ = page
+            .save_screenshot(
+                CaptureScreenshotParams::builder()
+                    .format(CaptureScreenshotFormat::Png)
+                    .capture_beyond_viewport(true)
+                    .clip(Viewport {
+                        x: 0.0,
+                        y: 0.0,
+                        width,
+                        height,
+                        scale: 1.0,
+                    })
+                    .build(),
+                "d:/tmp.png",
+            )
+            .await;
+    }
 
     // 6. 导航到目标 URL，并应用加载超时
     // let navigation_result = timeout(request_timeout, page.goto(url)).await;
@@ -380,4 +423,57 @@ pub async fn fetch_dynamic_page(
     browser_handle.abort();
 
     Ok(html)
+}
+
+// 对l_string里面的每个字符串，根据rplc的对应关系进行关键字原地替换
+pub fn replace_in_place(l_string: &mut [String], rplc: &HashMap<&str, &str>) {
+    if rplc.is_empty() {
+        return;
+    }
+
+    // 构建正则表达式，匹配所有需要替换的键  注意：如果键中包含正则特殊字符，需要转义
+    let patterns: Vec<String> = rplc.keys().map(|k| regex::escape(k)).collect();
+    // 使用 alternation (|) 组合所有键，例如: (Hello|World|Rust)
+    let combined_pattern = patterns.join("|");
+    let re = Regex::new(&combined_pattern).expect("Invalid regex");
+
+    for _s in l_string.iter_mut() {
+        let original = _s.as_str();
+        let mut result = String::with_capacity(original.len());
+        let mut last_end = 0;
+
+        // 手动迭代所有匹配项，这样可以完全控制生命周期和内存分配
+        for caps in re.captures_iter(original) {
+            if let Some(m) = caps.get(0) {
+                let matched_str = m.as_str();
+                let start = m.start();
+                let end = m.end();
+
+                // 添加未匹配的部分
+                result.push_str(&original[last_end..start]);
+
+                // 查找替换值
+                if let Some(&replacement) = rplc.get(matched_str) {
+                    result.push_str(replacement);
+                    trace!("{matched_str} -> {replacement}");
+                } else {
+                    // 如果没有替换值，保留原样
+                    result.push_str(matched_str);
+                }
+
+                last_end = end;
+            }
+        }
+
+        // 添加最后一部分未匹配的内容
+        if last_end < original.len() {
+            result.push_str(&original[last_end..]);
+        }
+
+        // 如果结果与原串不同，则更新
+        if result != original {
+            trace!("{original} -> {result}");
+            *_s = result;
+        }
+    }
 }
